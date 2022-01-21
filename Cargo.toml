@@ -1,0 +1,6 @@
+[workspace]
+members = [
+  "server",
+  "sessions",
+  "tanks-worker",
+]

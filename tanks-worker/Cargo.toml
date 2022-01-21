@@ -1,0 +1,45 @@
+[package]
+name = "tanks-worker"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[profile.release]
+opt-level = "s"
+
+[dependencies]
+js-sys = "0.3.55"
+wasm-bindgen = "0.2.74"
+wee_alloc = "0.4.5"
+console_error_panic_hook = "0.1.7"
+
+[dependencies.serde]
+version = "1.0.133"
+features = ['derive']
+
+[dependencies.web-sys]
+version = "0.3.55"
+features = [
+  'Response',
+  'BinaryType',
+  'MessageEvent',
+  'Blob',
+  'ProgressEvent',
+  'FileReader',
+  'WebSocket',
+  'CanvasRenderingContext2d',
+  'CssStyleDeclaration',
+  'Document',
+  'Element',
+  'EventTarget',
+  'HtmlCanvasElement',
+  'HtmlElement',
+  'MouseEvent',
+  'Node',
+  'Window',
+  "Location",
+]
