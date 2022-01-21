@@ -42,6 +42,7 @@ features = [
   'HtmlCanvasElement',
   'HtmlElement',
   'MouseEvent',
+  'KeyboardEvent',
   'Node',
   'Window',
   "Location",

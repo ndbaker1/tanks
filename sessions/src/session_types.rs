@@ -26,7 +26,7 @@ pub struct Session<T> {
     /// Active statuses of every Client in the Session
     pub client_statuses: HashMap<String, bool>,
     /// Data that you want to store in a sessions
-    pub data: Option<T>,
+    pub data: T,
 }
 
 impl<T> Session<T> {

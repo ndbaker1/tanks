@@ -1,33 +1,84 @@
-struct PlayerData {}
+use std::collections::HashMap;
+use tanks_core::{server_types::ServerEvent, shared_types::Coord};
+use web_sys::{CanvasRenderingContext2d, HtmlCanvasElement};
+
 struct ProjectileData {}
 
-#[allow(dead_code)]
-pub struct TanksState {
-    pub pos: (f64, f64),
-    player_data: Vec<PlayerData>,
+pub struct ClientGameState {
+    pub id: String,
+    pub mouse_pos: Coord,
+    pub player_data: HashMap<String, Coord>,
     projectile_data: Vec<ProjectileData>,
 }
 
-impl TanksState {
-    pub fn new() -> Self {
+impl ClientGameState {
+    pub fn new(id: &str) -> Self {
         Self {
-            pos: (0.0, 0.0),
-            player_data: Vec::new(),
+            id: id.to_string(),
+            mouse_pos: Coord { x: 0.0, y: 0.0 },
+            player_data: {
+                let mut data = HashMap::new();
+                data.insert(id.to_string(), Coord { x: 0.0, y: 0.0 });
+                data
+            },
             projectile_data: Vec::new(),
         }
     }
 
-    pub fn update(&mut self) {
-        let delta = self.delta();
-        self.pos.0 += delta;
-    }
+    pub fn update(&mut self) {}
 
-    pub fn add(&mut self, pos: (f64, f64)) {
-        self.pos.0 += pos.0;
-        self.pos.1 += pos.1;
-    }
-
+    #[allow(dead_code)]
     fn delta(&mut self) -> f64 {
         10.0
     }
+
+    /// Get the Player Data corresponding to the current player using the saved id
+    pub fn get_own_player_data(&mut self) -> &mut Coord {
+        self.player_data
+            .get_mut(&self.id)
+            .expect("player did not have their own ")
+    }
+}
+
+pub fn handle_server_event(event: ServerEvent, game_state: &mut ClientGameState) {
+    match event {
+        ServerEvent::PlayerPosUpdate { coord, player } => {
+            // either update the player or add them
+            if let Some(player_data) = game_state.player_data.get_mut(&player) {
+                *player_data = coord;
+            } else {
+                game_state.player_data.insert(player, coord);
+            }
+        }
+        ServerEvent::PlayerDisconnect { player } => {
+            game_state.player_data.remove(&player);
+        }
+    }
+}
+
+pub fn render(
+    element: &HtmlCanvasElement,
+    context: &CanvasRenderingContext2d,
+    game_state: &mut ClientGameState,
+) {
+    context.set_fill_style(&"#222".into());
+    context.fill_rect(0.0, 0.0, element.width().into(), element.height().into());
+
+    for (player, coord) in &mut game_state.player_data {
+        context.set_font("50px serif");
+        context
+            .stroke_text(&player, coord.x, coord.y)
+            .expect("text could not be drawn");
+        context.set_fill_style(&"red".into());
+        context.fill_rect(coord.x, coord.y, 200.0, 200.0);
+    }
+
+    context.set_stroke_style(&"white".into());
+    context.begin_path();
+    context.move_to(
+        game_state.get_own_player_data().x,
+        game_state.get_own_player_data().y,
+    );
+    context.line_to(game_state.mouse_pos.x, game_state.mouse_pos.y);
+    context.stroke();
 }

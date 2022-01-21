@@ -4,34 +4,35 @@ use server::{cleanup_session, notify_client, SafeClients, SafeSessions};
 use sessions::session_types::Session;
 use std::{collections::HashMap, time::Duration};
 use tanks_core::{
-    server_types::{
-        ClientEvent, ClientEventCode, EventBuilder, ServerEvent, ServerEventCode,
-        ServerEventDataBuilder,
-    },
-    shared_types::{Coord, GameData},
+    server_types::{ClientEvent, ServerEvent},
+    shared_types::{PlayerData, ServerGameState},
 };
 use tokio::time::delay_for;
 
 /// The handler for game logic on the server
 ///
 /// This will take a lot of bandwidth if the rate is too high
-pub async fn tick_handler(clients: SafeClients, sessions: SafeSessions<GameData>) {
+pub async fn tick_handler(clients: SafeClients, sessions: SafeSessions<ServerGameState>) {
     loop {
         for session in sessions.write().await.values_mut() {
-            if let Some(game_data) = &mut session.data {
-                for (player_id, player_data) in &mut game_data.player_data {
-                    let mut update_occured = false;
+            for (player_id, player_data) in &mut session.data.player_data {
+                let mut update_occured = false;
 
-                    if let Some(dir) = &player_data.direction {
-                        player_data.position.add(Coord::from_direction(dir));
-                        update_occured = true;
-                    }
+                if !player_data.keys_down.is_empty() {
+                    player_data.move_based_on_keys();
+                    update_occured = true;
+                }
 
-                    if update_occured {
-                        for (client_id, _) in &session.client_statuses {
-                            if let Some(client) = clients.read().await.get(client_id) {
-                                notify_client(client, &"dsf");
-                            }
+                if update_occured {
+                    for (client_id, _) in &session.client_statuses {
+                        if let Some(client) = clients.read().await.get(client_id) {
+                            notify_client(
+                                client,
+                                &ServerEvent::PlayerPosUpdate {
+                                    player: player_id.clone(),
+                                    coord: player_data.position.clone(),
+                                },
+                            );
                         }
                     }
                 }
@@ -47,7 +48,7 @@ pub async fn handle_event(
     client_id: String,
     event: String,
     clients: SafeClients,
-    sessions: SafeSessions<u32>,
+    sessions: SafeSessions<ServerGameState>,
 ) {
     //======================================================
     // Deserialize into Session Event object
@@ -60,224 +61,43 @@ pub async fn handle_event(
         }
     };
 
-    match client_event.event_code {
-        ClientEventCode::SessionRequest => {
-            let session_id: String = match get_client_session_id(&client_id, &clients).await {
-                Some(session_id) => session_id,
-                None => return, // no session is ok
-            };
-
-            // create a base server event
-            let mut server_data = ServerEventDataBuilder::default()
-                .session_id(session_id.clone())
-                .build()
-                .unwrap();
-
-            if let Some(session) = sessions.read().await.get(&session_id) {
-                server_data.session_client_ids = Some(session.get_client_ids());
+    match client_event {
+        ClientEvent::PlayerControlUpdate { key, press } => {
+            let session_id = get_client_session_id(&client_id, &clients).await.unwrap();
+            if let Some(session) = sessions.write().await.get_mut(&session_id) {
+                if let Some(player_data) = session.data.player_data.get_mut(&client_id) {
+                    match press {
+                        true => player_data.keys_down.remove(&key),
+                        false => player_data.keys_down.insert(key),
+                    };
+                }
             }
-
-            notify_client_async(
-                &client_id,
-                &EventBuilder::default()
-                    .event_code(ServerEventCode::SessionResponse)
-                    .data(server_data)
-                    .build()
-                    .unwrap(),
-                &clients,
-            )
-            .await;
         }
-        ClientEventCode::CreateSession => {
+        ClientEvent::CreateSession => {
             log::info!("request from {} to create new session", client_id);
             create_session(&client_id, None, &sessions, &clients).await;
         }
-        ClientEventCode::JoinSession => {
-            log::info!("request from {} to join new session", client_id);
-
-            let session_id = match client_event.data {
-                Some(data) => match data.session_id {
-                    Some(session_id) => session_id,
-                    None => panic!("no session id found!"),
-                },
-                None => {
-                    log::error!("the session id to join was missing in the request");
-                    return;
-                } // no session was found on a session join request? ¯\(°_o)/¯
-            };
-
-            log::info!(
-                "checking if client {} is already in session {}",
-                client_id,
-                session_id
-            );
-            if let Some(session) = sessions.read().await.get(&session_id) {
-                if session.client_statuses.contains_key(&client_id) {
-                    log::info!(
-                        "client {} was already in session {}. (no-op)",
-                        client_id,
-                        session.id
-                    );
-                    return;
-                }
-            }
-
-            // removing client front session
-            remove_client_from_current_session(&client_id, &clients, &sessions).await;
-
-            // Joining Some Session that already exists
-            if let Some(session) = sessions.write().await.get_mut(&session_id) {
-                // do not allow clients to join an active game
-                if session.data.is_none() {
-                    log::info!("adding client {} into session {}", client_id, session_id);
-                    insert_client_into_given_session(&client_id, &clients, session).await;
-                }
-                // notify the user that they cannot joing the current session
-                else {
-                    log::info!(
-                        "client {} was not allowed into in-progess session {}",
-                        client_id,
-                        session_id
-                    );
-                    notify_client_async(
-                        &client_id,
-                        &EventBuilder::default()
-                            .event_code(ServerEventCode::CannotJoinInProgress)
-                            .data(
-                                ServerEventDataBuilder::default()
-                                    .session_id(session_id)
-                                    .build()
-                                    .unwrap(),
-                            )
-                            .build()
-                            .unwrap(),
-                        &clients,
-                    )
-                    .await;
-                }
+        ClientEvent::JoinSession => {
+            // place player in first valid session
+            for session in sessions.write().await.values_mut() {
+                insert_client_into_given_session(&client_id, &clients, session).await;
                 return;
             }
-
-            // Attempt to join a Reserved session, which will be created if it doesnt exist
-            log::info!("creating a session from id: {}", session_id);
-            create_session(&client_id, Some(&session_id), &sessions, &clients).await;
+            create_session(&client_id, None, &sessions, &clients).await;
         }
-        ClientEventCode::LeaveSession => {
+        ClientEvent::LeaveSession => {
             remove_client_from_current_session(&client_id, &clients, &sessions).await;
-        }
-        ClientEventCode::StartGame => {
-            let session_id = match get_client_session_id(&client_id, &clients).await {
-                Some(s_id) => s_id,
-                None => return,
-            };
-
-            if let Some(_session) = sessions.read().await.get(&session_id) {
-                // initialize game data here...
-            }
-        }
-        ClientEventCode::Play => {
-            let _session_id: String = match get_client_session_id(&client_id, &clients).await {
-                Some(s_id) => s_id,
-                None => return,
-            };
-
-            // if let Some(game_state) = game_states.write().await.get_mut(&session_id) {
-            // if game_state.get_turn_player() != client_id {
-            //     if let Some(client) = clients.read().await.get(client_id) {
-            //         notify_client(
-            //             &EventBuilder::default()
-            //                 .event_code(ServerEventCode::LogicError)
-            //                 .message("It is not your turn to play.")
-            //                 .build()
-            //                 .unwrap(),
-            //             &client,
-            //         );
-            //     }
-            //     // exit
-            //     return;
-            // }
-
-            // let player_index = match game_state.get_player_index(client_id) {
-            //     Some(index) => index,
-            //     None => return,
-            // };
-
-            // match game_state.play(column, player_index) {
-            //     Ok(won) => {
-            //         if let Some(session) = sessions.read().await.get(&session_id) {
-            //             // if the move was a winning move, then notify everyone that the game is over
-            //             if won {
-            //                 notify_session(
-            //                     &EventBuilder::default()
-            //                         .event_code(ServerEventCode::GameEnded)
-            //                         .data(
-            //                             ServerEventDataBuilder::default()
-            //                                 // .client_id(client_id)
-            //                                 // .game_data(game_state.as_shared_game_data(None))
-            //                                 .build()
-            //                                 .unwrap(),
-            //                         )
-            //                         .build()
-            //                         .unwrap(),
-            //                     session,
-            //                     &clients,
-            //                 )
-            //                 .await;
-            //             }
-            //             // else continue emitting the game format
-            //             else {
-            //                 for (client_name, _) in &session.client_statuses {
-            //                     if let Some(client) = clients.read().await.get(client_name) {
-            //                         // notify_client(
-            //                         //     &EventBuilder::default()
-            //                         //         .event_code(ServerEventCode::TurnStart)
-            //                         //         .data(
-            //                         //             ServerEventDataBuilder::default()
-            //                         //                 .client_id(game_state.get_turn_player())
-            //                         //                 .game_data(
-            //                         //                     game_state.as_shared_game_data(Some(
-            //                         //                         client_name,
-            //                         //                     )),
-            //                         //                 )
-            //                         //                 .build()
-            //                         //                 .unwrap(),
-            //                         //         )
-            //                         //         .build()
-            //                         //         .unwrap(),
-            //                         //     &client,
-            //                         // );
-            //                     }
-            //                 }
-            //             }
-            //         }
-            //     }
-            //     Err(e) => {
-            //         if let Some(client) = clients.read().await.get(client_id) {
-            //             notify_client(
-            //                 &quick_server_error("This column has reached its max."),
-            //                 &client,
-            //             );
-            //         }
-            //         eprintln!(
-            //             "[ERROR] player {} failed to play with err: {}",
-            //             client_id, e,
-            //         )
-            //     }
-            // }
-            // }
         }
     }
 }
 
 /// Creates a Session with a given Client as its creator / first member
-pub async fn create_session<T>(
+pub async fn create_session(
     client_id: &str,
     session_id: Option<&str>,
-    sessions: &SafeSessions<T>,
+    sessions: &SafeSessions<ServerGameState>,
     clients: &SafeClients,
-) where
-    T: Clone,
-{
+) {
     log::info!("creating session..");
     let session = &mut Session {
         client_statuses: HashMap::new(),
@@ -286,7 +106,11 @@ pub async fn create_session<T>(
             Some(id) => id.to_string(),
             None => get_rand_session_id(),
         },
-        data: None,
+        data: ServerGameState {
+            player_data: [(client_id.to_string(), PlayerData::new())]
+                .into_iter()
+                .collect(),
+        },
     };
 
     // insert the host client into the session
@@ -305,38 +129,8 @@ pub async fn create_session<T>(
         client.session_id = Some(session.id.clone());
     }
 
-    log::info!("send notification to client {}", client_id);
-    if let Some(client) = clients.read().await.get(client_id) {
-        notify_client(
-            &client,
-            &EventBuilder::default()
-                .event_code(ServerEventCode::ClientJoined)
-                .data(
-                    ServerEventDataBuilder::default()
-                        .session_id(session.id.clone())
-                        .client_id(client_id.to_string())
-                        .session_client_ids(session.get_client_ids())
-                        .build()
-                        .unwrap(),
-                )
-                .build()
-                .expect("failed to build event"),
-        );
-    }
-
     log::info!("finished creating session {}", session.id);
     log::info!("sessions live: {}", sessions.read().await.len());
-}
-
-/// Send an update to all clients in the session
-///
-/// Uses a Read lock on clients
-async fn notify_session<T>(game_update: &ServerEvent, session: &Session<T>, clients: &SafeClients) {
-    for (client_id, _) in &session.client_statuses {
-        if let Some(client) = clients.read().await.get(client_id) {
-            notify_client(client, game_update);
-        }
-    }
 }
 
 /// Send and update to a set of clients
@@ -349,15 +143,6 @@ async fn _notify_clients(
         if let Some(client) = clients.read().await.get(client_id) {
             notify_client(client, game_update);
         }
-    }
-}
-
-/// Send an update to single clients
-async fn notify_client_async(client_id: &str, game_update: &ServerEvent, clients: &SafeClients) {
-    if let Some(client) = clients.read().await.get(client_id) {
-        notify_client(client, game_update);
-    } else {
-        log::error!("could not find client: {}", client_id);
     }
 }
 
@@ -382,22 +167,6 @@ async fn remove_client_from_current_session<T>(
 
     let mut session_empty: bool = false;
     if let Some(session) = sessions.write().await.get_mut(&session_id) {
-        // notify all clients in the sessions that the client will be leaving
-        notify_session(
-            &EventBuilder::default()
-                .event_code(ServerEventCode::ClientLeft)
-                .data(
-                    ServerEventDataBuilder::default()
-                        .client_id(client_id.to_string())
-                        .build()
-                        .unwrap(),
-                )
-                .build()
-                .unwrap(),
-            &session,
-            &clients,
-        )
-        .await;
         // remove the client from the session
         session.remove_client(&client_id.to_string());
 
@@ -424,49 +193,28 @@ async fn remove_client_from_current_session<T>(
 /// Takes a mutable session reference in order to add a client to a given session
 ///
 /// Uses a Read lock for Clients
-async fn insert_client_into_given_session<T>(
+async fn insert_client_into_given_session(
     client_id: &str,
     clients: &SafeClients,
-    session: &mut Session<T>,
+    session: &mut Session<ServerGameState>,
 ) {
     // add client to session
     session.insert_client(client_id, true);
+    // add client to gamedata
+    session
+        .data
+        .player_data
+        .insert(client_id.to_string(), PlayerData::new());
     // update session_id of client
     if let Some(client) = clients.write().await.get_mut(client_id) {
         client.session_id = Some(session.id.clone());
     }
-    // notify all clients in the session that the client has joined
-    notify_session(
-        &EventBuilder::default()
-            .event_code(ServerEventCode::ClientJoined)
-            .data(
-                ServerEventDataBuilder::default()
-                    .session_id(session.id.clone())
-                    .client_id(client_id.to_string())
-                    .session_client_ids(session.get_client_ids())
-                    .build()
-                    .unwrap(),
-            )
-            .build()
-            .unwrap(),
-        &session,
-        &clients,
-    )
-    .await;
+
+    log::info!("client <{}> joined session: <{}>", client_id, session.id);
 }
 
 fn set_new_session_owner<T>(session: &mut Session<T>, _clients: &SafeClients, client_id: &String) {
     session.owner = client_id.clone();
-    // notify_all_clients(
-    //   &ServerEvent {
-    //     event_code: ServerEventCode::SessionOwnerChange,
-    //     session_id: Some(session.id.clone()),
-    //     client_id: Some(client_id.clone()),
-    //     session_client_ids: None,
-    //   },
-    //   &session,
-    //   &clients,
-    // );
 }
 
 /// Gets a random new session 1 that is 5 characters long

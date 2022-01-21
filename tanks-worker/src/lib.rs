@@ -1,10 +1,13 @@
-use app::TanksState;
+use app::{handle_server_event, render, ClientGameState};
 use std::cell::RefCell;
 use std::panic;
-use tanks_core::shared_types::Coord;
+use tanks_core::{
+    server_types::{ClientEvent, ServerEvent},
+    shared_types::Coord,
+};
 use utils::*;
 use wasm_bindgen::{prelude::*, JsCast};
-use web_sys::{MessageEvent, MouseEvent, WebSocket};
+use web_sys::{KeyboardEvent, MessageEvent, MouseEvent, WebSocket};
 
 pub mod app;
 mod utils;
@@ -14,7 +17,7 @@ thread_local! {
     ///
     /// Do not panic while using this data, otherwise you may
     /// encounter a permanent locking of the Data
-    static DATA: RefCell<TanksState> = RefCell::new(TanksState::new());
+    static DATA: RefCell<ClientGameState> = RefCell::new(ClientGameState::new(""));
 
     /// Globally Store Mouse position
     static MOUSE_POS: RefCell<(f64,f64)> = RefCell::new((0.0,0.0));
@@ -37,7 +40,6 @@ extern "C" {
 #[wasm_bindgen(start)]
 pub fn start() {
     setup_logging();
-    setup_window();
 }
 
 #[wasm_bindgen]
@@ -45,96 +47,124 @@ pub fn start() {
 pub fn connect(socket_uri: &str) {
     let params = get_query_params();
 
-    let ws = WebSocket::new(&format!(
-        "{}/{}",
-        socket_uri,
-        params
-            .get("username")
-            .expect("no username given in query params")
-    ))
-    .expect("connection established");
+    let username = params
+        .get("username")
+        .expect("no username given in query params");
+
+    //======================================================
+    //
+    // WebSocket Setup
+    //
+    //======================================================
+    let ws =
+        WebSocket::new(&format!("{}/{}", socket_uri, username)).expect("connection established");
+
+    // Update the state once we have connected to the server
+    DATA.with(|data| *data.borrow_mut() = ClientGameState::new(username));
 
     let cloned_ws = ws.clone();
     let onmessage_callback = Closure::wrap(Box::new(move |e: MessageEvent| {
         if let Ok(a) = e.data().dyn_into::<js_sys::JsString>() {
-            let movement: Coord =
-                serde_json::from_str(&a.as_string().unwrap()).expect("invalid conversion");
+            let event: ServerEvent = match serde_json::from_str(&a.as_string().unwrap()) {
+                Ok(event) => event,
+                Err(e) => return, // failed conversion
+            };
 
-            DATA.with(|state| {
-                let mut game_state = state.borrow_mut();
-                // game_state.update();
-                game_state.add((movement.x, movement.y));
-            });
-            // console_log!("pos: {:#?}", game_state.pos);
+            DATA.with(|state| handle_server_event(event, &mut state.borrow_mut()));
         } else {
             console_log!("event: {:#?}", e.data());
         }
-    }) as Box<dyn FnMut(MessageEvent)>);
+    }) as Box<dyn FnMut(_)>);
     // set message event handler on WebSocket
     ws.set_onmessage(Some(onmessage_callback.as_ref().unchecked_ref()));
     // forget the callback to keep it alive
     onmessage_callback.forget();
 
-    //
     // Signal the server to place the client into a session
-    //
     let onopen_callback = Closure::wrap(Box::new(move |e: MessageEvent| {
-        cloned_ws.send_with_str(r#"{ "event_code": 2 }"#).unwrap();
-    }) as Box<dyn FnMut(MessageEvent)>);
+        cloned_ws
+            .send_with_str(&serde_json::to_string(&ClientEvent::JoinSession).unwrap())
+            .unwrap();
+    }) as Box<dyn FnMut(_)>);
     ws.set_onopen(Some(onopen_callback.as_ref().unchecked_ref()));
     // forget the callback to keep it alive
     onopen_callback.forget();
-}
 
-fn setup_logging() {
-    panic::set_hook(Box::new(console_error_panic_hook::hook));
-}
-
-fn setup_window() {
+    //======================================================
+    //
+    // Cavnas Setup
+    //
+    //======================================================
     let canvas_element = fetch_or_create_canvas();
     canvas_element.set_fullscreen();
 
+    //======================================================
+    //
+    // Cavnas Listers Setup
+    //
+    //======================================================
+
     // Mouse Tracking callback
     let mousemove_callback = Closure::wrap(Box::new(move |event: MouseEvent| {
-        MOUSE_POS.with(|pos| *pos.borrow_mut() = (event.offset_x() as f64, event.offset_y() as f64))
+        DATA.with(|state| {
+            state.borrow_mut().mouse_pos = Coord {
+                x: event.offset_x().into(),
+                y: event.offset_y().into(),
+            }
+        });
     }) as Box<dyn FnMut(_)>);
     canvas_element
         .add_event_listener_with_callback("mousemove", mousemove_callback.as_ref().unchecked_ref())
         .expect("failed to add listener");
     mousemove_callback.forget();
 
+    // Key Pressing Callback
+    let cloned_ws = ws.clone();
+    let keydown_callback = Closure::wrap(Box::new(move |event: KeyboardEvent| {
+        console_log!("erer");
+        let keypressed_event = ClientEvent::PlayerControlUpdate {
+            press: true,
+            key: event.key().to_uppercase(),
+        };
+        cloned_ws
+            .send_with_str(&serde_json::to_string(&keypressed_event).unwrap())
+            .expect("websocket sent");
+    }) as Box<dyn FnMut(_)>);
+    window()
+        .add_event_listener_with_callback("keydown", keydown_callback.as_ref().unchecked_ref())
+        .expect("failed to add listener");
+    keydown_callback.forget();
+
+    // Key Releasing Callback
+    let cloned_ws = ws.clone();
+    let keyup_callback = Closure::wrap(Box::new(move |event: KeyboardEvent| {
+        let keyreleased_event = ClientEvent::PlayerControlUpdate {
+            press: false,
+            key: event.key().to_uppercase(),
+        };
+        cloned_ws
+            .send_with_str(&serde_json::to_string(&keyreleased_event).unwrap())
+            .expect("websocket sent");
+    }) as Box<dyn FnMut(_)>);
+    window()
+        .add_event_listener_with_callback("keyup", keyup_callback.as_ref().unchecked_ref())
+        .expect("failed to add listener");
+    keyup_callback.forget();
+
+    //======================================================
+    //
+    // Cavnas Rendering Setup
+    //
+    //======================================================
     let canvas_context = canvas_element.get_2d_context();
 
     let render_loop = Box::new(move || {
-        DATA.with(|state| {
-            let game_state = state.borrow_mut();
-
-            canvas_context.set_fill_style(&"#222".into());
-            canvas_context.fill_rect(
-                0.0,
-                0.0,
-                canvas_element.width().into(),
-                canvas_element.height().into(),
-            );
-
-            canvas_context.set_fill_style(&"red".into());
-            canvas_context.fill_rect(
-                game_state.pos.0.into(),
-                game_state.pos.1.into(),
-                200.0,
-                200.0,
-            );
-
-            canvas_context.set_stroke_style(&"white".into());
-            canvas_context.begin_path();
-            canvas_context.move_to(game_state.pos.0.into(), game_state.pos.1.into());
-            MOUSE_POS.with(|pos| {
-                let mouse_pos = pos.borrow();
-                canvas_context.line_to(mouse_pos.0.into(), mouse_pos.1.into());
-            });
-            canvas_context.stroke();
-        })
+        DATA.with(|state| render(&canvas_element, &canvas_context, &mut state.borrow_mut()))
     });
 
     start_animation_loop(render_loop);
+}
+
+fn setup_logging() {
+    panic::set_hook(Box::new(console_error_panic_hook::hook));
 }

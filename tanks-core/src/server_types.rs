@@ -3,9 +3,8 @@
  */
 use derive_builder::Builder;
 use serde::{Deserialize, Serialize};
-use serde_repr::{Deserialize_repr, Serialize_repr};
 
-use crate::shared_types::GameData;
+use crate::shared_types::{Coord, ServerGameState};
 
 #[derive(Deserialize, Serialize, Builder)]
 #[builder(pattern = "immutable")]
@@ -17,9 +16,6 @@ pub struct Event<Code, PayloadType> {
     pub data: Option<PayloadType>,
 }
 
-pub type ServerEvent = Event<ServerEventCode, ServerEventData>;
-pub type ClientEvent = Event<ClientEventCode, ClientEventData>;
-
 #[derive(Serialize, Deserialize, Clone, Builder)]
 pub struct ServerEventData {
     #[builder(setter(strip_option), default)]
@@ -29,7 +25,7 @@ pub struct ServerEventData {
     #[builder(setter(strip_option), default)]
     pub session_client_ids: Option<Vec<String>>,
     #[builder(setter(strip_option), default)]
-    pub game_data: Option<GameData>,
+    pub game_data: Option<ServerGameState>,
 }
 
 #[derive(Serialize, Deserialize, Builder)]
@@ -42,28 +38,20 @@ pub struct ClientEventData {
     pub column: Option<usize>,
 }
 
-#[derive(Serialize_repr, Deserialize_repr, Clone)]
-#[repr(u8)]
-pub enum ServerEventCode {
-    ClientJoined = 1,
-    ClientLeft,
-    SessionResponse,
-    CannotJoinInProgress,
+#[derive(Serialize, Deserialize)]
+pub enum ServerEvent {
+    PlayerPosUpdate { player: String, coord: Coord },
+    PlayerDisconnect { player: String },
 }
 
-#[derive(Serialize_repr, Deserialize_repr)]
-#[repr(u8)]
-pub enum ClientEventCode {
-    /**
-     * Session Related Events
-     */
-    JoinSession = 1,
+#[derive(Serialize, Deserialize)]
+pub enum ClientEvent {
+    /// Store keys in UPPERCASE
+    PlayerControlUpdate {
+        key: String,
+        press: bool,
+    },
+    JoinSession,
     CreateSession,
     LeaveSession,
-    SessionRequest,
-    /**
-     * Game Related Events
-     */
-    StartGame,
-    Play,
 }
