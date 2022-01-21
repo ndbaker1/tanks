@@ -1,13 +1,13 @@
 use app::{handle_server_event, render, ClientGameState};
-use std::cell::RefCell;
 use std::panic;
+use std::{cell::RefCell, rc::Rc};
 use tanks_core::{
     server_types::{ClientEvent, ServerEvent},
     shared_types::Coord,
 };
 use utils::*;
 use wasm_bindgen::{prelude::*, JsCast};
-use web_sys::{KeyboardEvent, MessageEvent, MouseEvent, WebSocket};
+use web_sys::{Event, KeyboardEvent, MessageEvent, MouseEvent, WebSocket};
 
 pub mod app;
 mod utils;
@@ -43,7 +43,6 @@ pub fn start() {
 }
 
 #[wasm_bindgen]
-#[allow(unused_variables)]
 pub fn connect(socket_uri: &str) {
     let params = get_query_params();
 
@@ -67,7 +66,7 @@ pub fn connect(socket_uri: &str) {
         if let Ok(a) = e.data().dyn_into::<js_sys::JsString>() {
             let event: ServerEvent = match serde_json::from_str(&a.as_string().unwrap()) {
                 Ok(event) => event,
-                Err(e) => return, // failed conversion
+                Err(e) => return console_log!("{}", e), // failed conversion
             };
 
             DATA.with(|state| handle_server_event(event, &mut state.borrow_mut()));
@@ -81,7 +80,7 @@ pub fn connect(socket_uri: &str) {
     onmessage_callback.forget();
 
     // Signal the server to place the client into a session
-    let onopen_callback = Closure::wrap(Box::new(move |e: MessageEvent| {
+    let onopen_callback = Closure::wrap(Box::new(move |_: MessageEvent| {
         cloned_ws
             .send_with_str(&serde_json::to_string(&ClientEvent::JoinSession).unwrap())
             .unwrap();
@@ -95,8 +94,18 @@ pub fn connect(socket_uri: &str) {
     // Cavnas Setup
     //
     //======================================================
-    let canvas_element = fetch_or_create_canvas();
+    let canvas_element = Rc::new(fetch_or_create_canvas());
     canvas_element.set_fullscreen();
+
+    let cloned_canvas_element = canvas_element.clone();
+    let resize_callback = Closure::wrap(Box::new(move |_: Event| {
+        console_log!("resize");
+        cloned_canvas_element.set_fullscreen();
+    }) as Box<dyn FnMut(_)>);
+    window()
+        .add_event_listener_with_callback("resize", resize_callback.as_ref().unchecked_ref())
+        .expect("failed to add listener");
+    resize_callback.forget();
 
     //======================================================
     //
@@ -111,7 +120,7 @@ pub fn connect(socket_uri: &str) {
                 x: event.offset_x().into(),
                 y: event.offset_y().into(),
             }
-        });
+        })
     }) as Box<dyn FnMut(_)>);
     canvas_element
         .add_event_listener_with_callback("mousemove", mousemove_callback.as_ref().unchecked_ref())
@@ -152,9 +161,7 @@ pub fn connect(socket_uri: &str) {
     keyup_callback.forget();
 
     //======================================================
-    //
     // Cavnas Rendering Setup
-    //
     //======================================================
     let canvas_context = canvas_element.get_2d_context();
 

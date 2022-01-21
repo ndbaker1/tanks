@@ -61,16 +61,32 @@ pub fn render(
     context: &CanvasRenderingContext2d,
     game_state: &mut ClientGameState,
 ) {
+    context.save();
+
+    let (mid_width, mid_height) = (element.width() as f64 / 2.0, element.height() as f64 / 2.0);
+
+    let player_coord = game_state.get_own_player_data();
+    context
+        .translate(mid_width - player_coord.x, mid_height - player_coord.y)
+        .expect("failed to move camera");
+
     context.set_fill_style(&"#222".into());
-    context.fill_rect(0.0, 0.0, element.width().into(), element.height().into());
+    context.fill_rect(
+        player_coord.x - mid_width,
+        player_coord.y - mid_height,
+        element.width().into(),
+        element.height().into(),
+    );
 
     for (player, coord) in &mut game_state.player_data {
+        context.set_fill_style(&"red".into());
+        context.fill_rect(coord.x, coord.y, 40.0, 40.0);
+
+        context.set_fill_style(&"white".into());
         context.set_font("50px serif");
         context
-            .stroke_text(&player, coord.x, coord.y)
+            .fill_text(&player, coord.x, coord.y)
             .expect("text could not be drawn");
-        context.set_fill_style(&"red".into());
-        context.fill_rect(coord.x, coord.y, 200.0, 200.0);
     }
 
     context.set_stroke_style(&"white".into());
@@ -81,4 +97,6 @@ pub fn render(
     );
     context.line_to(game_state.mouse_pos.x, game_state.mouse_pos.y);
     context.stroke();
+
+    context.restore();
 }

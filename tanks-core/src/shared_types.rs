@@ -16,17 +16,17 @@ impl PlayerData {
     pub fn new() -> Self {
         Self {
             keys_down: HashSet::new(),
-            position: Coord { x: 0.0, y: 0.0 },
+            position: Coord { x: 200.0, y: 200.0 },
         }
     }
 
     pub fn move_based_on_keys(&mut self) {
         for key in &self.keys_down {
             let mut delta = match key.as_str() {
-                "W" => Coord::from_direction(&Direction::North),
-                "A" => Coord::from_direction(&Direction::West),
-                "S" => Coord::from_direction(&Direction::South),
-                "D" => Coord::from_direction(&Direction::East),
+                "W" | "ARROWUP" => Coord::from_direction(&Direction::North),
+                "A" | "ARROWLEFT" => Coord::from_direction(&Direction::West),
+                "S" | "ARROWDOWN" => Coord::from_direction(&Direction::South),
+                "D" | "ARROWRIGHT" => Coord::from_direction(&Direction::East),
                 _ => Coord { x: 0.0, y: 0.0 },
             };
             delta.scale(5.0);
@@ -54,14 +54,14 @@ impl Coord {
 
     pub fn from_direction(dir: &Direction) -> Self {
         match dir {
-            Direction::North => Coord { x: 0.0, y: 1.0 },
-            Direction::NorthEast => Coord { x: -1.0, y: 1.0 },
-            Direction::East => Coord { x: -1.0, y: 0.0 },
-            Direction::SouthEast => Coord { x: -1.0, y: -1.0 },
-            Direction::South => Coord { x: 0.0, y: -1.0 },
-            Direction::SouthWest => Coord { x: 1.0, y: -1.0 },
-            Direction::West => Coord { x: 1.0, y: 0.0 },
-            Direction::NorthWest => Coord { x: 1.0, y: 1.0 },
+            Direction::North => Coord { x: 0.0, y: -1.0 },
+            Direction::NorthEast => Coord { x: 1.0, y: -1.0 },
+            Direction::East => Coord { x: 1.0, y: 0.0 },
+            Direction::SouthEast => Coord { x: 1.0, y: 1.0 },
+            Direction::South => Coord { x: 0.0, y: 1.0 },
+            Direction::SouthWest => Coord { x: -1.0, y: 1.0 },
+            Direction::West => Coord { x: -1.0, y: 0.0 },
+            Direction::NorthWest => Coord { x: -1.0, y: -1.0 },
         }
     }
 }

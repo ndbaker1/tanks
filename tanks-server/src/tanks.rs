@@ -67,8 +67,8 @@ pub async fn handle_event(
             if let Some(session) = sessions.write().await.get_mut(&session_id) {
                 if let Some(player_data) = session.data.player_data.get_mut(&client_id) {
                     match press {
-                        true => player_data.keys_down.remove(&key),
-                        false => player_data.keys_down.insert(key),
+                        true => player_data.keys_down.insert(key),
+                        false => player_data.keys_down.remove(&key),
                     };
                 }
             }

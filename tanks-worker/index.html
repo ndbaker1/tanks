@@ -1,0 +1,13 @@
+<html>
+<style>
+  body { margin: 0; }
+</style>
+<body>
+<script async type="module">
+  import init, { connect } from './tanks_worker.js'
+  await init()
+  connect('wss://' + location.host + '/api/ws')
+</script>
+</body>
+
+</html>

@@ -1057,7 +1057,6 @@ dependencies = [
 name = "tanks-core"
 version = "0.1.0"
 dependencies = [
- "derive_builder",
  "serde",
  "serde_json",
  "serde_repr",
