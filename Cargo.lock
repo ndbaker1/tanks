@@ -985,8 +985,6 @@ dependencies = [
 name = "server"
 version = "0.1.0"
 dependencies = [
- "derive_builder",
- "env_logger",
  "futures",
  "log",
  "nanoid",
@@ -1056,12 +1054,45 @@ dependencies = [
 ]
 
 [[package]]
+name = "tanks-core"
+version = "0.1.0"
+dependencies = [
+ "derive_builder",
+ "serde",
+ "serde_json",
+ "serde_repr",
+]
+
+[[package]]
+name = "tanks-server"
+version = "0.1.0"
+dependencies = [
+ "derive_builder",
+ "env_logger",
+ "futures",
+ "log",
+ "nanoid",
+ "nanorand",
+ "serde",
+ "serde_json",
+ "serde_repr",
+ "server",
+ "sessions",
+ "tanks-core",
+ "tokio",
+ "urlencoding 2.1.0",
+ "warp",
+]
+
+[[package]]
 name = "tanks-worker"
 version = "0.1.0"
 dependencies = [
  "console_error_panic_hook",
  "js-sys",
  "serde",
+ "serde_json",
+ "tanks-core",
  "wasm-bindgen",
  "web-sys",
  "wee_alloc",

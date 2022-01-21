@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use crate::{data_types, ws};
+use crate::{ws, SafeClients, SafeSessions};
 use futures::Future;
 use log::info;
 use warp::hyper::StatusCode;
@@ -18,16 +18,13 @@ impl warp::reject::Reject for IDAlreadyTaken {}
 pub async fn ws_handler<T, F, Fut>(
     ws: warp::ws::Ws,
     id: String,
-    clients: data_types::SafeClients,
-    sessions: data_types::SafeSessions<T>,
+    clients: SafeClients,
+    sessions: SafeSessions<T>,
     event_handler: Arc<F>,
 ) -> Result<impl Reply>
 where
     T: 'static + Sync + Send + Clone,
-    F: Fn(String, String, data_types::SafeClients, data_types::SafeSessions<T>) -> Fut
-        + Send
-        + Sync
-        + 'static,
+    F: Fn(String, String, SafeClients, SafeSessions<T>) -> Fut + Send + Sync + 'static,
     Fut: Future<Output = ()> + Send + Sync + 'static,
 {
     let client_exists = clients.read().await.get(&id).is_none();

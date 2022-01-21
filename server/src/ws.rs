@@ -1,8 +1,7 @@
-use std::sync::Arc;
-
-use crate::data_types;
+use crate::{cleanup_session, SafeClients, SafeSessions};
 use futures::{Future, FutureExt, StreamExt};
-use sessions::session_types;
+use sessions::session_types::{self, Client};
+use std::sync::Arc;
 use tokio::sync::mpsc::{self};
 use urlencoding::decode;
 use warp::ws::WebSocket;
@@ -11,12 +10,12 @@ use warp::ws::WebSocket;
 pub async fn client_connection<T, F, Fut>(
     ws: WebSocket,
     connection_id: String,
-    clients: data_types::SafeClients,
-    sessions: data_types::SafeSessions<T>,
+    clients: SafeClients,
+    sessions: SafeSessions<T>,
     event_handler: Arc<F>,
 ) where
     T: 'static + Clone,
-    F: Fn(String, String, data_types::SafeClients, data_types::SafeSessions<T>) -> Fut,
+    F: Fn(String, String, SafeClients, SafeSessions<T>) -> Fut,
     Fut: Future<Output = ()>,
 {
     // Decode the strings coming in over URL parameters so we dont get things like '%20'
@@ -130,10 +129,7 @@ pub async fn client_connection<T, F, Fut>(
 /// If a client exists in a session, then set their status to inactive.
 ///
 /// If setting inactive status would leave no other active member, remove the session
-async fn handle_client_disconnect<T>(
-    client: &session_types::Client,
-    sessions: &data_types::SafeSessions<T>,
-) {
+async fn handle_client_disconnect<T>(client: &Client, sessions: &SafeSessions<T>) {
     log::info!("client <{}> disconnected", client.id);
     if let Some(session_id) = &client.session_id {
         let mut session_empty = false;
@@ -153,10 +149,7 @@ async fn handle_client_disconnect<T>(
 }
 
 /// If a client exists in a session, then set their status to active
-async fn handle_client_connect<T>(
-    client: &session_types::Client,
-    sessions: &data_types::SafeSessions<T>,
-) {
+async fn handle_client_connect<T>(client: &Client, sessions: &SafeSessions<T>) {
     log::info!("{} connected", client.id);
     if let Some(session_id) = &client.session_id {
         if let Some(session) = sessions.write().await.get_mut(session_id) {
@@ -168,23 +161,11 @@ async fn handle_client_connect<T>(
 }
 
 /// Gets the SessionID of a client if it exists
-async fn get_client_session_id<T>(
-    client_id: &str,
-    sessions: &data_types::SafeSessions<T>,
-) -> Option<String> {
+async fn get_client_session_id<T>(client_id: &str, sessions: &SafeSessions<T>) -> Option<String> {
     for session in sessions.read().await.values() {
         if session.contains_client(client_id) {
             return Some(session.id.clone());
         }
     }
     return None;
-}
-
-/// Remove a sessions and the possible game state that accompanies it
-pub async fn cleanup_session<T>(session_id: &str, sessions: &data_types::SafeSessions<T>) {
-    // remove session
-    sessions.write().await.remove(session_id);
-    // log status
-    log::info!("removed empty session");
-    log::info!("sessions live: {}", sessions.read().await.len());
 }

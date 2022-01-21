@@ -2,5 +2,7 @@
 members = [
   "server",
   "sessions",
+  "tanks-core",
+  "tanks-server",
   "tanks-worker",
 ]

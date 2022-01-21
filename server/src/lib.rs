@@ -1,7 +1,7 @@
-use data_types::{SafeClients, SafeSessions};
 use futures::Future;
 use serde::Serialize;
 use sessions::session_types::Client;
+use sessions::session_types::{Clients, Sessions};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
@@ -9,11 +9,13 @@ use warp::filters::BoxedFilter;
 use warp::ws::Message;
 use warp::{Filter, Reply};
 
-pub mod data_types;
-pub mod game_engine;
 mod handler;
-mod shared_types;
 mod ws;
+
+type SafeResource<T> = Arc<RwLock<T>>;
+
+pub type SafeClients = SafeResource<Clients>;
+pub type SafeSessions<T> = SafeResource<Sessions<T>>;
 
 pub struct ServerConfig<C1, C2, F1, F2>
 where
@@ -93,4 +95,13 @@ where
     if let Err(e) = sender.send(Ok(Message::text(serde_json::to_string(message).unwrap()))) {
         log::error!("failed to send message to {} with err: {}", client.id, e,);
     }
+}
+
+/// Remove a sessions and the possible game state that accompanies it
+pub async fn cleanup_session<T>(session_id: &str, sessions: &SafeSessions<T>) {
+    // remove session
+    sessions.write().await.remove(session_id);
+    // log status
+    log::info!("removed empty session");
+    log::info!("sessions live: {}", sessions.read().await.len());
 }
