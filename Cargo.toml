@@ -5,5 +5,5 @@ opt-level = "s"
 members = [
   "tanks-core",
   "tanks-server",
-  "tanks-worker",
+  "tanks-wasm",
 ]

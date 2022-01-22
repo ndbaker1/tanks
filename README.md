@@ -2,7 +2,7 @@
 
 🎮 A Realtime Multiplayer Server/Client Game example built entirely with Rust 🦀
 
-✨Zero lines of JavaScript besides [html file for bootstrapping wasm](./tanks-worker/index.html)✨
+✨Zero lines of JavaScript besides [html file for bootstrapping wasm](./tanks-wasm/index.html)✨
 
 ## Background
 

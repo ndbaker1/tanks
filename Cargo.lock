@@ -1056,7 +1056,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "tanks-worker"
+name = "tanks-wasm"
 version = "0.1.0"
 dependencies = [
  "console_error_panic_hook",
@@ -1423,7 +1423,7 @@ dependencies = [
 [[package]]
 name = "websocket-server"
 version = "0.1.0"
-source = "git+https://github.com/ndbaker1/websocket-server#2443d6c99a7bcc8a2368b70242d32c842b662fbd"
+source = "git+https://github.com/ndbaker1/websocket-server?rev=2443d6c#2443d6c99a7bcc8a2368b70242d32c842b662fbd"
 dependencies = [
  "futures",
  "log",

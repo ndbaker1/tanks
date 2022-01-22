@@ -1,0 +1,13 @@
+[tasks.wasm]
+command = "wasm-pack"
+args = ["build", "--target", "web", "--out-dir", "../dist"]
+
+[tasks.html]
+command = "cp"
+args = ["index.html", "../dist/index.html"]
+
+[tasks.build]
+dependencies = [
+    "wasm",
+    "html"
+]

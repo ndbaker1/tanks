@@ -4,7 +4,7 @@
 </style>
 <body>
 <script async type="module">
-  import init, { connect } from './tanks_worker.js'
+  import init, { connect } from './tanks_wasm.js'
   await init()
 
   const secure = location.protocol.includes('https')
