@@ -56,10 +56,7 @@ pub async fn handle_event(
     //======================================================
     let client_event = match from_str::<ClientEvent>(&event) {
         Ok(obj) => obj,
-        Err(_) => {
-            log::error!("failed to parse ClientEvent struct from string: {}", event);
-            return;
-        }
+        Err(_) => return log::error!("failed to parse ClientEvent struct from string: {}", event),
     };
 
     match client_event {
@@ -75,15 +72,16 @@ pub async fn handle_event(
             }
         }
         ClientEvent::CreateSession => {
-            log::info!("request from {} to create new session", client_id);
+            log::info!("request from <{}> to create new session", client_id);
             create_session(&client_id, None, &sessions, &clients).await;
         }
         ClientEvent::JoinSession => {
+            log::info!("request from <{}> to join a session", client_id);
             // place player in first valid session
             for session in sessions.write().await.values_mut() {
-                insert_client_into_given_session(&client_id, &clients, session).await;
-                return;
+                return insert_client_into_given_session(&client_id, &clients, session).await;
             }
+
             create_session(&client_id, None, &sessions, &clients).await;
         }
         ClientEvent::LeaveSession => {
@@ -145,12 +143,9 @@ async fn remove_client_from_current_session<T>(
         client_id
     );
 
-    let session_id: String = match get_client_session_id(client_id, clients).await {
-        Some(s_id) => s_id,
-        None => {
-            log::warn!("client {} was not in a session", client_id);
-            return;
-        } // client did not exist in any session
+    let session_id = match get_client_session_id(client_id, clients).await {
+        Some(session_id) => session_id,
+        None => return log::warn!("client {} was not in a session", client_id),
     };
 
     let session_empty = match sessions.write().await.get_mut(&session_id) {
@@ -211,7 +206,7 @@ fn get_rand_session_id() -> String {
 
 /// pull the session id off of a client
 async fn get_client_session_id(client_id: &str, clients: &SafeClients) -> Option<String> {
-    match &clients.read().await.get(client_id) {
+    match clients.read().await.get(client_id) {
         Some(client) => client.session_id.clone(),
         None => None,
     }
