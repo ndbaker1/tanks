@@ -7,17 +7,13 @@ use urlencoding::decode;
 use warp::ws::WebSocket;
 
 /// The Initial Setup for a WebSocket Connection
-pub async fn client_connection<T, F, Fut>(
+pub async fn client_connection<T, Fut: Future>(
     ws: WebSocket,
     connection_id: String,
     clients: SafeClients,
     sessions: SafeSessions<T>,
-    event_handler: Arc<F>,
-) where
-    T: 'static + Clone,
-    F: Fn(String, String, SafeClients, SafeSessions<T>) -> Fut,
-    Fut: Future<Output = ()>,
-{
+    event_handler: Arc<fn(String, String, SafeClients, SafeSessions<T>) -> Fut>,
+) {
     // Decode the strings coming in over URL parameters so we dont get things like '%20'
     // for spaces in our clients map
     let id = decode(&connection_id).expect("UTF-8").to_string();
@@ -86,27 +82,16 @@ pub async fn client_connection<T, F, Fut>(
                         return;
                     }
                 };
-
-                match message {
-                    //======================================================
-                    // ignore pings
-                    //======================================================
-                    "ping" | "ping\n" => {
-                        log::info!("ignoring ping...");
-                    }
-                    //======================================================
-                    // Game Session Related Events
-                    //======================================================
-                    _ => {
-                        event_handler(
-                            id.clone(),
-                            message.to_string(),
-                            clients.clone(),
-                            sessions.clone(),
-                        )
-                        .await;
-                    }
-                }
+                //======================================================
+                // pass the message to the event handler
+                //======================================================
+                event_handler(
+                    id.clone(),
+                    message.to_string(),
+                    clients.clone(),
+                    sessions.clone(),
+                )
+                .await;
             }
             Err(e) => {
                 log::error!(

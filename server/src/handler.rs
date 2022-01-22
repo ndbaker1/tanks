@@ -1,8 +1,7 @@
-use std::sync::Arc;
-
 use crate::{ws, SafeClients, SafeSessions};
 use futures::Future;
 use log::info;
+use std::sync::Arc;
 use warp::hyper::StatusCode;
 use warp::Rejection;
 use warp::Reply;
@@ -15,17 +14,16 @@ impl warp::reject::Reject for IDAlreadyTaken {}
 
 /// Will handle a Client attempting to connect a websocket with the server
 /// A User Requesting to be connected to an already connected ID will be rejected
-pub async fn ws_handler<T, F, Fut>(
+pub async fn ws_handler<T, Fut>(
     ws: warp::ws::Ws,
     id: String,
     clients: SafeClients,
     sessions: SafeSessions<T>,
-    event_handler: Arc<F>,
+    event_handler: Arc<fn(String, String, SafeClients, SafeSessions<T>) -> Fut>,
 ) -> Result<impl Reply>
 where
-    T: 'static + Sync + Send + Clone,
-    F: Fn(String, String, SafeClients, SafeSessions<T>) -> Fut + Send + Sync + 'static,
-    Fut: Future<Output = ()> + Send + Sync + 'static,
+    T: Clone + Send + Sync + 'static,
+    Fut: Future + Send + 'static,
 {
     let client_exists = clients.read().await.get(&id).is_none();
     match client_exists {

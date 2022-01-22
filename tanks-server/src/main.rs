@@ -14,7 +14,10 @@ async fn main() {
     env_logger::init();
 
     // Pass handlers for the server into the ServerConfig to get them initialized with the application
-    let server_config = ServerConfig::from(tanks::handle_event, tanks::tick_handler);
+    let server_config = ServerConfig {
+        tick_handler: tanks::tick_handler,
+        event_handler: tanks::handle_event,
+    };
 
     warp::serve(server(server_config))
         .run(([0, 0, 0, 0], port))

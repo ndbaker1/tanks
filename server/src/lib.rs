@@ -3,7 +3,6 @@ use serde::Serialize;
 use sessions::session_types::Client;
 use sessions::session_types::{Clients, Sessions};
 use std::collections::HashMap;
-use std::marker::PhantomData;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use warp::filters::BoxedFilter;
@@ -18,46 +17,24 @@ type SafeResource<T> = Arc<RwLock<T>>;
 pub type SafeClients = SafeResource<Clients>;
 pub type SafeSessions<T> = SafeResource<Sessions<T>>;
 
-pub struct ServerConfig<T, C1, C2, F1, F2>
+pub struct ServerConfig<T, Fut1, Fut2>
 where
     T: Clone,
-    C1: Fn(String, String, SafeClients, SafeSessions<T>) -> F1 + Send + Sync + 'static,
-    C2: Fn(SafeClients, SafeSessions<T>) -> F2 + Send + Sync + 'static,
-    F1: Future<Output = ()> + Send + Sync + 'static,
-    F2: Future<Output = ()> + Send + Sync + 'static,
+    Fut1: Future + Send + Sync,
+    Fut2: Future + Send + Sync,
 {
-    pub event_handler: C1,
-    pub tick_handler: C2,
-    _d: PhantomData<T>,
-}
-
-impl<T, C1, C2, F1, F2> ServerConfig<T, C1, C2, F1, F2>
-where
-    T: Clone,
-    C1: Fn(String, String, SafeClients, SafeSessions<T>) -> F1 + Send + Sync + 'static,
-    C2: Fn(SafeClients, SafeSessions<T>) -> F2 + Send + Sync + 'static,
-    F1: Future<Output = ()> + Send + Sync + 'static,
-    F2: Future<Output = ()> + Send + Sync + 'static,
-{
-    pub fn from(event_handler: C1, tick_handler: C2) -> Self {
-        Self {
-            event_handler,
-            tick_handler,
-            _d: PhantomData,
-        }
-    }
+    pub tick_handler: fn(SafeClients, SafeSessions<T>) -> Fut1,
+    pub event_handler: fn(String, String, SafeClients, SafeSessions<T>) -> Fut2,
 }
 
 /// Composite backend and frontend routes for the entire server
-pub fn server<T, C1, C2, F1, F2>(
-    server_config: ServerConfig<T, C1, C2, F1, F2>,
+pub fn server<T, Fut1, Fut2>(
+    server_config: ServerConfig<T, Fut1, Fut2>,
 ) -> BoxedFilter<(impl Reply,)>
 where
     T: Clone + Send + Sync + 'static,
-    C1: Fn(String, String, SafeClients, SafeSessions<T>) -> F1 + Send + Sync + 'static,
-    C2: Fn(SafeClients, SafeSessions<T>) -> F2 + Send + Sync + 'static,
-    F1: Future<Output = ()> + Send + Sync + 'static,
-    F2: Future<Output = ()> + Send + Sync + 'static,
+    Fut1: Future<Output = ()> + Send + Sync + 'static,
+    Fut2: Future<Output = ()> + Send + Sync + 'static,
 {
     warp::path("api")
         .and(backend(server_config))
@@ -66,13 +43,11 @@ where
 }
 
 /// Routes handling server requests and connections
-fn backend<T, C1, C2, F1, F2>(config: ServerConfig<T, C1, C2, F1, F2>) -> BoxedFilter<(impl Reply,)>
+fn backend<T, Fut1, Fut2>(config: ServerConfig<T, Fut1, Fut2>) -> BoxedFilter<(impl Reply,)>
 where
     T: Clone + Send + Sync + 'static,
-    C1: Fn(String, String, SafeClients, SafeSessions<T>) -> F1 + Send + Sync + 'static,
-    C2: Fn(SafeClients, SafeSessions<T>) -> F2 + Send + Sync + 'static,
-    F1: Future<Output = ()> + Send + Sync + 'static,
-    F2: Future<Output = ()> + Send + Sync + 'static,
+    Fut1: Future<Output = ()> + Send + Sync + 'static,
+    Fut2: Future<Output = ()> + Send + Sync + 'static,
 {
     let clients: SafeClients = Arc::new(RwLock::new(HashMap::new()));
     let sessions: SafeSessions<T> = Arc::new(RwLock::new(HashMap::new()));
