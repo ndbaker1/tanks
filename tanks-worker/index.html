@@ -6,7 +6,12 @@
 <script async type="module">
   import init, { connect } from './tanks_worker.js'
   await init()
-  connect('wss://' + location.host + '/api/ws')
+
+  const secure = location.protocol.includes('https')
+  const createWebsocketUri = (path) =>
+    `${secure ? 'wss' : 'ws'}://${location.host}/${path}`
+
+  connect(createWebsocketUri('api/ws'))
 </script>
 </body>
 
