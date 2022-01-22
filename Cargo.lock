@@ -982,15 +982,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "sessions"
-version = "0.1.0"
-source = "git+https://github.com/ndbaker1/websocket-server#fe09fd1a41cec2e73de5529b6425bf33f6c2957e"
-dependencies = [
- "tokio",
- "warp",
-]
-
-[[package]]
 name = "sha-1"
 version = "0.9.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1057,7 +1048,6 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_repr",
- "sessions",
  "tanks-core",
  "tokio",
  "urlencoding 2.1.0",
@@ -1433,7 +1423,7 @@ dependencies = [
 [[package]]
 name = "websocket-server"
 version = "0.1.0"
-source = "git+https://github.com/ndbaker1/websocket-server#fe09fd1a41cec2e73de5529b6425bf33f6c2957e"
+source = "git+https://github.com/ndbaker1/websocket-server#2443d6c99a7bcc8a2368b70242d32c842b662fbd"
 dependencies = [
  "futures",
  "log",
@@ -1441,7 +1431,6 @@ dependencies = [
  "nanorand",
  "serde",
  "serde_json",
- "sessions",
  "tokio",
  "urlencoding 2.1.0",
  "warp",

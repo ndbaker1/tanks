@@ -1,13 +1,14 @@
 use nanoid::nanoid;
 use serde_json::from_str;
-use sessions::session_types::Session;
 use std::{collections::HashMap, time::Duration};
 use tanks_core::{
     server_types::{ClientEvent, ServerEvent},
     shared_types::{PlayerData, ServerGameState},
 };
 use tokio::time::delay_for;
-use websocket_server::{cleanup_session, notify_client, SafeClients, SafeSessions};
+use websocket_server::{
+    cleanup_session, message_client, sessions::Session, SafeClients, SafeSessions,
+};
 
 /// The handler for game logic on the server
 ///
@@ -26,7 +27,7 @@ pub async fn tick_handler(clients: SafeClients, sessions: SafeSessions<ServerGam
                 if update_occured {
                     for (client_id, _) in &session.client_statuses {
                         if let Some(client) = clients.read().await.get(client_id) {
-                            notify_client(
+                            message_client(
                                 client,
                                 &ServerEvent::PlayerPosUpdate {
                                     player: player_id.clone(),
@@ -133,19 +134,6 @@ pub async fn create_session(
     log::info!("sessions live: {}", sessions.read().await.len());
 }
 
-/// Send and update to a set of clients
-async fn _notify_clients(
-    game_update: &ServerEvent,
-    client_ids: &Vec<String>,
-    clients: &SafeClients,
-) {
-    for client_id in client_ids {
-        if let Some(client) = clients.read().await.get(client_id) {
-            notify_client(client, game_update);
-        }
-    }
-}
-
 /// Removes a client from the session that they currently exist under
 async fn remove_client_from_current_session<T>(
     client_id: &str,
@@ -165,26 +153,24 @@ async fn remove_client_from_current_session<T>(
         } // client did not exist in any session
     };
 
-    let mut session_empty: bool = false;
-    if let Some(session) = sessions.write().await.get_mut(&session_id) {
-        // remove the client from the session
-        session.remove_client(&client_id.to_string());
+    let session_empty = match sessions.write().await.get_mut(&session_id) {
+        Some(session) => {
+            // remove the client from the session
+            session.remove_client(&client_id.to_string());
 
-        log::info!("removed client {} from session {}", client_id, session_id);
+            log::info!("removed client {} from session {}", client_id, session_id);
 
-        // revoke the client's copy of the session_id
-        if let Some(client) = clients.write().await.get_mut(client_id) {
-            client.session_id = None;
+            // revoke the client's copy of the session_id
+            if let Some(client) = clients.write().await.get_mut(client_id) {
+                client.session_id = None;
+            }
+
+            session.get_clients_with_active_status(true).is_empty()
         }
-        // checks the statuses to see if any users are still active
-        session_empty = session.get_clients_with_active_status(true).is_empty();
-        // if the session is not empty, make someone else the owner
-        if !session_empty {
-            set_new_session_owner(session, &clients, &session.get_client_ids()[0]);
-        }
-    }
+        None => false,
+    };
+
     // clean up the session from the map if it is empty
-    // * we cannot do this in the scope above because because we are already holding a mutable reference to a session within the map
     if session_empty {
         cleanup_session(&session_id, sessions).await;
     }
@@ -213,14 +199,10 @@ async fn insert_client_into_given_session(
     log::info!("client <{}> joined session: <{}>", client_id, session.id);
 }
 
-fn set_new_session_owner<T>(session: &mut Session<T>, _clients: &SafeClients, client_id: &String) {
-    session.owner = client_id.clone();
-}
-
 /// Gets a random new session 1 that is 5 characters long
 /// This should almost ensure session uniqueness when dealing with a sizeable number of sessions
 fn get_rand_session_id() -> String {
-    let alphabet: [char; 26] = [
+    let alphabet = [
         'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R',
         'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z',
     ];

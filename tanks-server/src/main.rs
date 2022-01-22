@@ -15,8 +15,9 @@ async fn main() {
 
     // Pass handlers for the server into the ServerConfig to get them initialized with the application
     let server_config = ServerConfig {
+        tick_server: true,
         tick_handler: tanks::tick_handler,
-        event_handler: tanks::handle_event,
+        message_handler: tanks::handle_event,
     };
 
     warp::serve(server(server_config))
