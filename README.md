@@ -12,6 +12,6 @@ Therefore, I decided to make this as a general example for myself (and practice 
 
 ## Libraries
 
-The [Server](https://github.com/ndbaker1/websocket-server) is a [`Warp`](https://github.com/seanmonstar/warp) server setup handles WebSockets.
+The server is a [`Warp`](https://github.com/seanmonstar/warp) server setup to handle WebSockets.
 <br>
-I actually wrote my own WebSocker-server wrapper that accepts custom `MessageEventHandler` and `ServerTickHandler`, that way I can reuse it for multiple browser games.
+I wrote [this websocket server](https://github.com/ndbaker1/websocket-server) wrapper that accepts custom `MessageEventHandler` and `ServerTickHandler`, that way I can reuse it for multiple browser games.
