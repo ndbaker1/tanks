@@ -1,6 +1,5 @@
 use nanoid::nanoid;
 use serde_json::from_str;
-use server::{cleanup_session, notify_client, SafeClients, SafeSessions};
 use sessions::session_types::Session;
 use std::{collections::HashMap, time::Duration};
 use tanks_core::{
@@ -8,6 +7,7 @@ use tanks_core::{
     shared_types::{PlayerData, ServerGameState},
 };
 use tokio::time::delay_for;
+use websocket_server::{cleanup_session, notify_client, SafeClients, SafeSessions};
 
 /// The handler for game logic on the server
 ///

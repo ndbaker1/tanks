@@ -3,8 +3,6 @@ opt-level = "s"
 
 [workspace]
 members = [
-  "server",
-  "sessions",
   "tanks-core",
   "tanks-server",
   "tanks-worker",

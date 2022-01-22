@@ -1,5 +1,5 @@
-use server::{server, ServerConfig};
 use std::env;
+use websocket_server::{server, ServerConfig};
 
 pub mod tanks;
 

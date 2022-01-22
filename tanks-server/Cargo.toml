@@ -6,8 +6,8 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-server = { path = "../server" }
-sessions = { path = "../sessions" }
+sessions = { git = "https://github.com/ndbaker1/websocket-server" }
+websocket-server = { git = "https://github.com/ndbaker1/websocket-server" }
 tanks-core = { path = "../tanks-core" }
 
 log = "0.4"
