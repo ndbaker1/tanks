@@ -700,6 +700,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "624a8340c38c1b80fd549087862da4ba43e08858af025b236e509b6649fc13d5"
 
 [[package]]
+name = "pack-wasm"
+version = "0.1.0"
+
+[[package]]
 name = "percent-encoding"
 version = "2.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1029,14 +1033,14 @@ dependencies = [
 ]
 
 [[package]]
-name = "tanks-core"
+name = "tanks_core"
 version = "0.1.0"
 dependencies = [
  "serde",
 ]
 
 [[package]]
-name = "tanks-server"
+name = "tanks_server"
 version = "0.1.0"
 dependencies = [
  "derive_builder",
@@ -1048,7 +1052,7 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_repr",
- "tanks-core",
+ "tanks_core",
  "tokio",
  "urlencoding 2.1.0",
  "warp",
@@ -1056,14 +1060,14 @@ dependencies = [
 ]
 
 [[package]]
-name = "tanks-wasm"
+name = "tanks_wasm"
 version = "0.1.0"
 dependencies = [
  "console_error_panic_hook",
  "js-sys",
  "serde",
  "serde_json",
- "tanks-core",
+ "tanks_core",
  "wasm-bindgen",
  "web-sys",
  "wee_alloc",

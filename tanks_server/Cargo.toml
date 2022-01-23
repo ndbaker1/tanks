@@ -1,5 +1,5 @@
 [package]
-name = "tanks-server"
+name = "tanks_server"
 version = "0.1.0"
 edition = "2021"
 
@@ -7,7 +7,7 @@ edition = "2021"
 
 [dependencies]
 websocket-server = { git = "https://github.com/ndbaker1/websocket-server", rev = "2443d6c" }
-tanks-core = { path = "../tanks-core" }
+tanks_core = { path = "../tanks_core" }
 
 log = "0.4"
 env_logger = "0.8.4"

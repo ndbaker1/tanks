@@ -3,7 +3,9 @@ opt-level = "s"
 
 [workspace]
 members = [
-  "tanks-core",
-  "tanks-server",
-  "tanks-wasm",
+  "tanks_core",
+  "tanks_server",
+  "tanks_wasm",
+
+  "pack-wasm",
 ]
