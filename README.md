@@ -10,7 +10,7 @@ So I wanted to make a game completely in Rust but could only find small bits of 
 
 Therefore, I decided to make this as a general example for myself (and practice my Rust) regarding how to implement several critical Rust WASM features, such as implementing WebSockets and drawing to a browser Canvas exclusively from Rust APIs.
 
-## Libraries
+## Libraries 📚
 
 The server is a [`Warp`](https://github.com/seanmonstar/warp) server setup to handle WebSockets.
 <br>
@@ -18,7 +18,7 @@ I wrote [this websocket server](https://github.com/ndbaker1/websocket-server) wr
 
 ## Building 🔨
 
-`pack-wasm ` lib is my hacky way of creating a custom build script for packing wasm and including an index page file which I find slightly annoying using `wasm-pack` because you cant specify the .wasm target like with `wasm-bindgen-cli`
+`pack-wasm` lib is my hacky way of creating a custom build script for packing wasm and including an index page file which I find slightly annoying using `wasm-pack` because you cant specify the `.wasm` target like with `wasm-bindgen-cli`
 ```sh
 cargo run --bin pack-wasm
 ```
