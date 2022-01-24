@@ -1,10 +1,8 @@
 use app::{handle_server_event, render, ClientGameState};
+use regex::Regex;
 use std::panic;
 use std::{cell::RefCell, rc::Rc};
-use tanks_core::{
-    server_types::{ClientEvent, ServerEvent},
-    shared_types::Coord,
-};
+use tanks_core::{server_types::ClientEvent, shared_types::Coord};
 use utils::*;
 use wasm_bindgen::{prelude::*, JsCast};
 use web_sys::{Event, HtmlCanvasElement, KeyboardEvent, MessageEvent, MouseEvent, WebSocket};
@@ -25,6 +23,10 @@ thread_local! {
     static GAME_STATE: RefCell<ClientGameState> = RefCell::new(ClientGameState::new(""));
 
     static CONNECTION_STATE: RefCell<ConnectionState> = RefCell::new(ConnectionState::default());
+
+    static USERNAME: RefCell<String> = RefCell::new(String::new());
+
+    static TEXT_MATCHER: Regex = Regex::new(r"^[a-zA-Z0-9]$").unwrap();
 }
 
 macro_rules! console_log {
@@ -47,8 +49,8 @@ pub fn start() {
     let canvas_element = setup_canvas();
     setup_window_listeners();
 
-    let draw_proc = move || render(&canvas_element, &canvas_element.get_2d_context());
-    start_animation_loop(Box::new(draw_proc));
+    let draw_procedure = move || render(&canvas_element, &canvas_element.get_2d_context());
+    start_animation_loop(Box::new(draw_procedure));
 }
 
 fn setup_logging() {
@@ -56,14 +58,7 @@ fn setup_logging() {
 }
 
 /// Connects to the WebSocket using the username entered by the User
-fn connect_to_server() {
-    let username = get_query_params()
-        .get("username")
-        .expect("no username given in query params")
-        .clone();
-
-    let ws = WebSocket::new(&get_websocket_uri(&username)).expect("failed to connect to websocket");
-
+fn setup_websocket_listeners(ws: &WebSocket) {
     let onmessage_callback = Closure::wrap(Box::new(move |e: MessageEvent| {
         match e.data().dyn_into::<js_sys::JsString>() {
             Ok(event_message) => match serde_json::from_str(&event_message.as_string().unwrap()) {
@@ -92,11 +87,6 @@ fn connect_to_server() {
     ws.set_onopen(Some(onopen_callback.as_ref().unchecked_ref()));
     // forget the callback to keep it alive
     onopen_callback.forget();
-
-    // hold websocket reference
-    CONNECTION_STATE.with(|state| state.borrow_mut().ws = Some(ws));
-    // update game state
-    GAME_STATE.with(|data| *data.borrow_mut() = ClientGameState::new(&username));
 }
 
 /// Canvas Listeners Setup
@@ -137,21 +127,42 @@ fn setup_window_listeners() {
 
     // Key Pressing Callback
     let keydown_callback = Closure::wrap(Box::new(move |event: KeyboardEvent| {
-        if event.key() == "Enter" {
-            connect_to_server();
-        }
-
-        let keypressed_event = ClientEvent::PlayerControlUpdate {
-            press: true,
-            key: event.key().to_uppercase(),
-        };
         CONNECTION_STATE.with(|state| {
-            if let Some(ws) = &state.borrow().ws {
-                if ws.is_ready() {
-                    ws.send_with_str(&serde_json::to_string(&keypressed_event).unwrap())
-                        .expect("websocket sent");
+            let mut connection_state = state.borrow_mut();
+            match &connection_state.ws {
+                Some(ws) => {
+                    if ws.is_ready() {
+                        let keypressed_event = ClientEvent::PlayerControlUpdate {
+                            press: true,
+                            key: event.key().to_uppercase(),
+                        };
+
+                        ws.send_with_str(&serde_json::to_string(&keypressed_event).unwrap())
+                            .expect("websocket sent");
+                    }
                 }
-            }
+                None => USERNAME.with(|username| {
+                    let mut username = username.borrow_mut();
+                    let key = event.key();
+                    match key.as_str() {
+                        "Enter" => {
+                            let ws = WebSocket::new(&get_websocket_uri(&username))
+                                .expect("failed to connect to websocket");
+                            setup_websocket_listeners(&ws);
+                            connection_state.ws = Some(ws);
+                            GAME_STATE
+                                .with(|data| *data.borrow_mut() = ClientGameState::new(&username));
+                        }
+                        "Backspace" => {
+                            username.pop();
+                        }
+                        _ => match TEXT_MATCHER.with(|re| re.is_match(&key)) {
+                            true => username.push_str(&event.key()),
+                            false => {}
+                        },
+                    }
+                }),
+            };
         });
     }) as Box<dyn FnMut(_)>);
     window()
