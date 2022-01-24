@@ -29,8 +29,7 @@ impl ClientGameState {
         }
     }
 
-    pub fn update(&mut self) {}
-
+    /// Gets the angle of the player to the mouse
     pub fn get_mouse_angle(&self) -> f64 {
         let camera_pos = self.get_camera_pos();
         let player_pos = self.get_own_player_data();
