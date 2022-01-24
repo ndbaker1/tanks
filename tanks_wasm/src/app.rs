@@ -1,12 +1,16 @@
 use crate::{
-    utils::{get_window_bounds, Prepared},
+    utils::{get_block_size, get_window_bounds, Prepared},
     CONNECTION_STATE, GAME_STATE, USERNAME,
 };
 use std::{collections::HashMap, f64::consts::PI};
-use tanks_core::{server_types::ServerEvent, shared_types::Vec2d};
+use tanks_core::{
+    server_types::ServerEvent,
+    shared_types::{Vec2d, MAP_HEIGHT, MAP_WIDTH},
+};
 use web_sys::{CanvasRenderingContext2d, HtmlCanvasElement};
 
 pub struct ClientPlayerData {}
+
 pub struct ClientGameState {
     pub id: String,
     /// Mouse Position relative to bounds of the window
@@ -18,9 +22,9 @@ pub struct ClientGameState {
 impl ClientGameState {
     pub fn new(id: &str) -> Self {
         Self {
-            id: id.to_string(),
+            id: String::from(id),
             mouse_pos: Vec2d::zero(),
-            player_data: [(id.to_string(), Vec2d::zero())].into_iter().collect(),
+            player_data: [(String::from(id), Vec2d::zero())].into_iter().collect(),
             projectile_data: Vec::new(),
         }
     }
@@ -92,20 +96,28 @@ fn render_game(context: &CanvasRenderingContext2d) {
 
         let player_coord = game_state.get_own_player_data();
 
-        let camera_pos = game_state.get_camera_pos();
-        // drawing background color
-        context
-            .translate(-camera_pos.x, -camera_pos.y)
-            .expect("failed to move camera");
+        let block_size = get_block_size();
 
-        let player_size = 40.0;
+        let colors = ["#5C6784", "#1D263B"];
+        for col in 0..MAP_WIDTH {
+            for row in 0..MAP_HEIGHT {
+                context.set_fill_style(&colors[(col + row).rem_euclid(2)].into());
+                context.fill_rect(
+                    block_size * col as f64,
+                    block_size * row as f64,
+                    block_size,
+                    block_size,
+                );
+            }
+        }
+
         for (player, coord) in &game_state.player_data {
             context.set_fill_style(&"red".into());
             context.fill_rect(
-                coord.x - player_size / 2.0,
-                coord.y - player_size / 2.0,
-                player_size,
-                player_size,
+                coord.x - block_size / 2.0,
+                coord.y - block_size / 2.0,
+                block_size,
+                block_size,
             );
 
             context.set_fill_style(&"white".into());
@@ -118,7 +130,7 @@ fn render_game(context: &CanvasRenderingContext2d) {
             context.set_fill_style(&"grey".into());
             context.begin_path();
             context
-                .arc(bullet.x, bullet.y, 5.0, 0.0, 2.0 * PI)
+                .arc(bullet.x, bullet.y, block_size / 6.0, 0.0, 2.0 * PI)
                 .expect("bullet could not be drawn");
             context.fill();
         }
@@ -126,10 +138,7 @@ fn render_game(context: &CanvasRenderingContext2d) {
         context.set_stroke_style(&"white".into());
         context.begin_path();
         context.move_to(player_coord.x, player_coord.y);
-        context.line_to(
-            camera_pos.x + game_state.mouse_pos.x,
-            camera_pos.y + game_state.mouse_pos.y,
-        );
+        context.line_to(game_state.mouse_pos.x, game_state.mouse_pos.y);
         context.stroke();
 
         context.restore();
@@ -149,11 +158,13 @@ fn render_login(context: &CanvasRenderingContext2d) {
         .fill_text("Enter a name:", mid_width, mid_height)
         .expect("text could not be drawn");
 
+    context.set_font("18px monospace");
     context
         .fill_text("then press Enter", mid_width, mid_height * 1.9)
         .expect("text could not be drawn");
 
     USERNAME.with(|username| {
+        context.set_font("32px monospace");
         context
             .fill_text(&username.borrow_mut(), mid_width, mid_height + 50.0)
             .expect("text could not be drawn");

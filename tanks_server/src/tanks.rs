@@ -41,14 +41,9 @@ pub async fn tick_handler(clients: SafeClients, sessions: SafeSessions<ServerGam
                     .data
                     .players
                     .iter_mut()
-                    .filter_map(|(player_id, player_data)| {
-                        match !player_data.keys_down.is_empty() {
-                            true => {
-                                player_data.move_based_on_keys();
-                                Some((player_id, player_data))
-                            }
-                            false => None,
-                        }
+                    .filter_map(|(player_id, player_data)| match player_data.tick() {
+                        true => Some((player_id, player_data)),
+                        false => None,
                     });
 
             for (player_id, player_data) in update_list {
@@ -143,21 +138,22 @@ pub async fn create_session(
     log::info!("creating session..");
     let session = &mut Session {
         client_statuses: HashMap::new(),
-        owner: client_id.to_string(),
+        owner: String::from(client_id),
         id: match session_id {
-            Some(id) => id.to_string(),
+            Some(id) => String::from(id),
             None => get_rand_session_id(),
         },
         data: ServerGameState {
-            players: [(client_id.to_string(), PlayerData::new())]
+            players: [(String::from(client_id), PlayerData::new(client_id))]
                 .into_iter()
                 .collect(),
             bullets: Vec::new(),
+            map: HashMap::new(),
         },
     };
 
     // insert the host client into the session
-    session.insert_client(&client_id.to_string(), true);
+    session.insert_client(&String::from(client_id), true);
 
     log::info!("writing new session {} to global sessions", session.id);
     // add a new session into the server
@@ -195,7 +191,7 @@ async fn remove_client_from_current_session<T>(
     let session_empty = match sessions.write().await.get_mut(&session_id) {
         Some(session) => {
             // remove the client from the session
-            session.remove_client(&client_id.to_string());
+            session.remove_client(client_id);
 
             log::info!("removed client {} from session {}", client_id, session_id);
 
@@ -229,7 +225,7 @@ async fn insert_client_into_given_session(
     session
         .data
         .players
-        .insert(client_id.to_string(), PlayerData::new());
+        .insert(String::from(client_id), PlayerData::new(client_id));
     // update session_id of client
     if let Some(client) = clients.write().await.get_mut(client_id) {
         client.session_id = Some(session.id.clone());

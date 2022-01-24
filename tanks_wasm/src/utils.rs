@@ -1,5 +1,5 @@
 use std::{cell::RefCell, rc::Rc};
-use tanks_core::shared_types::Vec2d;
+use tanks_core::shared_types::{Vec2d, MAP_HEIGHT, MAP_WIDTH};
 use wasm_bindgen::{prelude::*, JsCast};
 use web_sys::{CanvasRenderingContext2d, HtmlCanvasElement, WebSocket};
 
@@ -109,6 +109,7 @@ pub fn start_animation_loop(mut draw_call: Box<dyn FnMut()>) {
     request_animation_frame(g.borrow().as_ref().unwrap());
 }
 
+/// Fetch the appropriate websocket uri according to the protocol of the url
 pub fn get_websocket_uri(username: &str) -> String {
     let websocket_protocol = match window()
         .location()
@@ -139,4 +140,9 @@ impl Prepared for WebSocket {
     fn is_ready(&self) -> bool {
         self.ready_state() == 1
     }
+}
+
+pub fn get_block_size() -> f64 {
+    let bounds = get_window_bounds();
+    (bounds.x / MAP_WIDTH as f64).min(bounds.y / MAP_HEIGHT as f64)
 }

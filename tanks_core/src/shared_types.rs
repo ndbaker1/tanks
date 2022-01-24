@@ -3,13 +3,27 @@ use std::collections::{HashMap, HashSet};
 
 /// Trait for an Object that can update on the server Tick
 pub trait Tick {
+    /// Update the Object
     fn tick(&mut self) -> bool;
+}
+
+/// The number of squares in the map horizontally
+pub const MAP_WIDTH: usize = 24;
+/// The number of squares in the map vertically
+pub const MAP_HEIGHT: usize = 12;
+
+/// Wall objects that should be drawn and collided with
+#[derive(Deserialize, Serialize, Debug, Clone)]
+pub enum Wall {
+    Indestructable,
+    Desructable,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct ServerGameState {
     pub players: HashMap<String, PlayerData>,
     pub bullets: Vec<Bullet>,
+    pub map: HashMap<(usize, usize), Wall>,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -31,14 +45,35 @@ impl Tick for Bullet {
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
+pub enum PlayerState {
+    Shooting,
+    Idle,
+}
+
+#[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct PlayerData {
+    pub id: String,
+    pub state: PlayerState,
     pub position: Vec2d,
     pub keys_down: HashSet<String>,
 }
 
+impl Tick for PlayerData {
+    fn tick(&mut self) -> bool {
+        if !self.keys_down.is_empty() {
+            self.move_based_on_keys();
+            return true;
+        }
+
+        false
+    }
+}
+
 impl PlayerData {
-    pub fn new() -> Self {
+    pub fn new(id: &str) -> Self {
         Self {
+            id: String::from(id),
+            state: PlayerState::Idle,
             keys_down: HashSet::new(),
             position: Vec2d::zero(),
         }
