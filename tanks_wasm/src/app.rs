@@ -57,6 +57,9 @@ pub fn handle_server_event(event: ServerEvent, game_state: &mut ClientGameState)
 }
 
 pub fn render(element: &HtmlCanvasElement, context: &CanvasRenderingContext2d) {
+    context.set_fill_style(&"#222".into());
+    context.fill_rect(0.0, 0.0, element.width().into(), element.height().into());
+
     GAME_STATE.with(|state| {
         let game_state = state.borrow_mut();
 
@@ -70,13 +73,6 @@ pub fn render(element: &HtmlCanvasElement, context: &CanvasRenderingContext2d) {
         context
             .translate(mid_width - player_coord.x, mid_height - player_coord.y)
             .expect("failed to move camera");
-        context.set_fill_style(&"#222".into());
-        context.fill_rect(
-            player_coord.x - mid_width,
-            player_coord.y - mid_height,
-            element.width().into(),
-            element.height().into(),
-        );
 
         for (player, coord) in &game_state.player_data {
             context.set_fill_style(&"red".into());
@@ -91,11 +87,11 @@ pub fn render(element: &HtmlCanvasElement, context: &CanvasRenderingContext2d) {
 
         context.set_stroke_style(&"white".into());
         context.begin_path();
-        context.move_to(
-            game_state.get_own_player_data().x,
-            game_state.get_own_player_data().y,
+        context.move_to(player_coord.x, player_coord.y);
+        context.line_to(
+            game_state.mouse_pos.x + player_coord.x - mid_width,
+            game_state.mouse_pos.y + player_coord.y - mid_height,
         );
-        context.line_to(game_state.mouse_pos.x, game_state.mouse_pos.y);
         context.stroke();
 
         context.restore();
