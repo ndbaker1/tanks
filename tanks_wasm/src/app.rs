@@ -1,5 +1,5 @@
 use crate::{
-    utils::{get_window_bounds, Background},
+    utils::{get_window_bounds, Prepared},
     CONNECTION_STATE, GAME_STATE, USERNAME,
 };
 use std::{collections::HashMap, f64::consts::PI};
@@ -90,12 +90,12 @@ pub fn render(element: &HtmlCanvasElement, context: &CanvasRenderingContext2d) {
     });
 
     match connected {
-        true => render_game(element, context),
-        false => render_login(element, context),
+        true => render_game(context),
+        false => render_login(context),
     };
 }
 
-fn render_game(element: &HtmlCanvasElement, context: &CanvasRenderingContext2d) {
+fn render_game(context: &CanvasRenderingContext2d) {
     GAME_STATE.with(|state| {
         let game_state = state.borrow_mut();
 
@@ -147,10 +147,11 @@ fn render_game(element: &HtmlCanvasElement, context: &CanvasRenderingContext2d) 
     });
 }
 
-fn render_login(element: &HtmlCanvasElement, context: &CanvasRenderingContext2d) {
+fn render_login(context: &CanvasRenderingContext2d) {
     context.set_text_align("center");
 
-    let (mid_width, mid_height) = (element.width() as f64 / 2.0, element.height() as f64 / 2.0);
+    let bounds = get_window_bounds();
+    let (mid_width, mid_height) = (bounds.x / 2.0, bounds.y / 2.0);
 
     context.set_fill_style(&"white".into());
     context.set_font("32px monospace");

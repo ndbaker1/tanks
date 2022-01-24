@@ -1,4 +1,4 @@
-use std::{cell::RefCell, collections::HashMap, rc::Rc};
+use std::{cell::RefCell, rc::Rc};
 use tanks_core::shared_types::Vec2d;
 use wasm_bindgen::{prelude::*, JsCast};
 use web_sys::{CanvasRenderingContext2d, HtmlCanvasElement, WebSocket};
@@ -130,11 +130,11 @@ pub fn get_websocket_uri(username: &str) -> String {
 }
 
 /// Trait for an object that can be checked whether it is ready to use
-pub trait Background {
+pub trait Prepared {
     fn is_ready(&self) -> bool;
 }
 
-impl Background for WebSocket {
+impl Prepared for WebSocket {
     /// More readable way of checking that the READY_STATE of the websocket is OPEN
     fn is_ready(&self) -> bool {
         self.ready_state() == 1
