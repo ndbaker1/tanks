@@ -2,7 +2,7 @@ use app::{handle_server_event, render, ClientGameState};
 use regex::Regex;
 use std::panic;
 use std::{cell::RefCell, rc::Rc};
-use tanks_core::{server_types::ClientEvent, shared_types::Coord};
+use tanks_core::{server_types::ClientEvent, shared_types::Vec2d};
 use utils::*;
 use wasm_bindgen::{prelude::*, JsCast};
 use web_sys::{Event, HtmlCanvasElement, KeyboardEvent, MessageEvent, MouseEvent, WebSocket};
@@ -65,7 +65,7 @@ fn setup_websocket_listeners(ws: &WebSocket) {
                 Ok(event) => {
                     GAME_STATE.with(|state| handle_server_event(event, &mut state.borrow_mut()))
                 }
-                Err(e) => console_log!("failed convserion into Server Event :: {}", e),
+                Err(e) => console_log!("failed conversion into Server Event :: {}", e),
             },
             Err(_) => console_log!("what is that event? => {:#?}", e.data()),
         }
@@ -114,7 +114,7 @@ fn setup_window_listeners() {
     // Mouse Tracking callback
     let mousemove_callback = Closure::wrap(Box::new(move |event: MouseEvent| {
         GAME_STATE.with(|state| {
-            state.borrow_mut().mouse_pos = Coord {
+            state.borrow_mut().mouse_pos = Vec2d {
                 x: event.offset_x().into(),
                 y: event.offset_y().into(),
             }
@@ -124,6 +124,26 @@ fn setup_window_listeners() {
         .add_event_listener_with_callback("mousemove", mousemove_callback.as_ref().unchecked_ref())
         .expect("failed to add listener");
     mousemove_callback.forget();
+
+    // Mouse Click Click
+    let click_callback = Closure::wrap(Box::new(move |_: MouseEvent| {
+        CONNECTION_STATE.with(|state| {
+            if let Some(ws) = &state.borrow_mut().ws {
+                if ws.is_ready() {
+                    let tank_shoot = ClientEvent::PlayerShoot {
+                        angle: GAME_STATE.with(|state| state.borrow().get_mouse_angle()),
+                    };
+
+                    ws.send_with_str(&serde_json::to_string(&tank_shoot).unwrap())
+                        .expect("websocket sent");
+                }
+            }
+        });
+    }) as Box<dyn FnMut(_)>);
+    window()
+        .add_event_listener_with_callback("click", click_callback.as_ref().unchecked_ref())
+        .expect("failed to add listener");
+    click_callback.forget();
 
     // Key Pressing Callback
     let keydown_callback = Closure::wrap(Box::new(move |event: KeyboardEvent| {

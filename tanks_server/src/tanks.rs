@@ -3,7 +3,7 @@ use serde_json::from_str;
 use std::{collections::HashMap, time::Duration};
 use tanks_core::{
     server_types::{ClientEvent, ServerEvent},
-    shared_types::{PlayerData, ServerGameState},
+    shared_types::{Bullet, PlayerData, ServerGameState, Tick, Vec2d},
 };
 use tokio::time::delay_for;
 use websocket_server::{
@@ -16,25 +16,51 @@ use websocket_server::{
 pub async fn tick_handler(clients: SafeClients, sessions: SafeSessions<ServerGameState>) {
     loop {
         for session in sessions.write().await.values_mut() {
-            for (player_id, player_data) in &mut session.data.player_data {
-                let mut update_occured = false;
+            for bullet in &mut session.data.bullets {
+                bullet.tick();
+            }
 
-                if !player_data.keys_down.is_empty() {
-                    player_data.move_based_on_keys();
-                    update_occured = true;
+            for (client_id, _) in &session.client_statuses {
+                if let Some(client) = clients.read().await.get(client_id) {
+                    message_client(
+                        client,
+                        &ServerEvent::BulletData(
+                            session
+                                .data
+                                .bullets
+                                .iter()
+                                .map(|bullet| (bullet.pos.clone(), bullet.angle))
+                                .collect(),
+                        ),
+                    );
                 }
+            }
 
-                if update_occured {
-                    for (client_id, _) in &session.client_statuses {
-                        if let Some(client) = clients.read().await.get(client_id) {
-                            message_client(
-                                client,
-                                &ServerEvent::PlayerPosUpdate {
-                                    player: player_id.clone(),
-                                    coord: player_data.position.clone(),
-                                },
-                            );
+            let update_list =
+                session
+                    .data
+                    .players
+                    .iter_mut()
+                    .filter_map(|(player_id, player_data)| {
+                        match !player_data.keys_down.is_empty() {
+                            true => {
+                                player_data.move_based_on_keys();
+                                Some((player_id, player_data))
+                            }
+                            false => None,
                         }
+                    });
+
+            for (player_id, player_data) in update_list {
+                for (client_id, _) in &session.client_statuses {
+                    if let Some(client) = clients.read().await.get(client_id) {
+                        message_client(
+                            client,
+                            &ServerEvent::PlayerPosUpdate {
+                                player: player_id.clone(),
+                                coord: player_data.position.clone(),
+                            },
+                        );
                     }
                 }
             }
@@ -63,11 +89,28 @@ pub async fn handle_event(
         ClientEvent::PlayerControlUpdate { key, press } => {
             let session_id = get_client_session_id(&client_id, &clients).await.unwrap();
             if let Some(session) = sessions.write().await.get_mut(&session_id) {
-                if let Some(player_data) = session.data.player_data.get_mut(&client_id) {
+                if let Some(player_data) = session.data.players.get_mut(&client_id) {
                     match press {
                         true => player_data.keys_down.insert(key),
                         false => player_data.keys_down.remove(&key),
                     };
+                }
+            }
+        }
+        ClientEvent::PlayerShoot { angle } => {
+            let session_id = get_client_session_id(&client_id, &clients).await.unwrap();
+
+            if let Some(session) = sessions.write().await.get_mut(&session_id) {
+                if let Some(player) = session.data.players.get(&client_id) {
+                    let bullet_speed = 10.0;
+                    session.data.bullets.push(Bullet {
+                        angle,
+                        pos: player.position.clone(),
+                        velocity: Vec2d {
+                            x: bullet_speed * angle.cos(),
+                            y: bullet_speed * angle.sin(),
+                        },
+                    });
                 }
             }
         }
@@ -106,9 +149,10 @@ pub async fn create_session(
             None => get_rand_session_id(),
         },
         data: ServerGameState {
-            player_data: [(client_id.to_string(), PlayerData::new())]
+            players: [(client_id.to_string(), PlayerData::new())]
                 .into_iter()
                 .collect(),
+            bullets: Vec::new(),
         },
     };
 
@@ -184,7 +228,7 @@ async fn insert_client_into_given_session(
     // add client to gamedata
     session
         .data
-        .player_data
+        .players
         .insert(client_id.to_string(), PlayerData::new());
     // update session_id of client
     if let Some(client) = clients.write().await.get_mut(client_id) {

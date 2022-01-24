@@ -1,24 +1,28 @@
-use std::collections::HashMap;
-use tanks_core::{server_types::ServerEvent, shared_types::Coord};
+use crate::{
+    utils::{get_window_bounds, Background},
+    CONNECTION_STATE, GAME_STATE, USERNAME,
+};
+use std::{collections::HashMap, f64::consts::PI};
+use tanks_core::{server_types::ServerEvent, shared_types::Vec2d};
 use web_sys::{CanvasRenderingContext2d, HtmlCanvasElement};
 
-use crate::{utils::Background, CONNECTION_STATE, GAME_STATE, USERNAME};
-
+pub struct ClientPlayerData {}
 pub struct ClientGameState {
     pub id: String,
-    pub mouse_pos: Coord,
-    pub player_data: HashMap<String, Coord>,
-    pub projectile_data: Vec<Coord>,
+    /// Mouse Position relative to bounds of the window
+    pub mouse_pos: Vec2d,
+    pub player_data: HashMap<String, Vec2d>,
+    pub projectile_data: Vec<Vec2d>,
 }
 
 impl ClientGameState {
     pub fn new(id: &str) -> Self {
         Self {
             id: id.to_string(),
-            mouse_pos: Coord { x: 0.0, y: 0.0 },
+            mouse_pos: Vec2d { x: 0.0, y: 0.0 },
             player_data: {
                 let mut data = HashMap::new();
-                data.insert(id.to_string(), Coord { x: 0.0, y: 0.0 });
+                data.insert(id.to_string(), Vec2d { x: 0.0, y: 0.0 });
                 data
             },
             projectile_data: Vec::new(),
@@ -27,16 +31,33 @@ impl ClientGameState {
 
     pub fn update(&mut self) {}
 
-    #[allow(dead_code)]
-    fn delta(&mut self) -> f64 {
-        10.0
+    pub fn get_mouse_angle(&self) -> f64 {
+        let camera_pos = self.get_camera_pos();
+        let player_pos = self.get_own_player_data();
+        let delta_x = camera_pos.x + self.mouse_pos.x - player_pos.x;
+        let delta_y = camera_pos.y + self.mouse_pos.y - player_pos.y;
+        (delta_y).atan2(delta_x)
     }
 
     /// Get the Player Data corresponding to the current player using the saved id
-    pub fn get_own_player_data(&self) -> &Coord {
+    pub fn get_own_player_data(&self) -> &Vec2d {
         self.player_data
             .get(&self.id)
-            .expect("player did not have their own ")
+            .expect("player did not have their own data")
+    }
+
+    /// The Camera Position for the Player
+    ///
+    /// This is the Top-Left coordinate
+    pub fn get_camera_pos(&self) -> Vec2d {
+        let bounds = get_window_bounds();
+        let (mid_width, mid_height) = (bounds.x / 2.0, bounds.y / 2.0);
+        let player_coord = self.get_own_player_data();
+
+        Vec2d {
+            x: player_coord.x - mid_width,
+            y: player_coord.y - mid_height,
+        }
     }
 }
 
@@ -52,6 +73,9 @@ pub fn handle_server_event(event: ServerEvent, game_state: &mut ClientGameState)
         }
         ServerEvent::PlayerDisconnect { player } => {
             game_state.player_data.remove(&player);
+        }
+        ServerEvent::BulletData(bullets) => {
+            game_state.projectile_data = bullets.into_iter().map(|(pos, _)| pos).collect()
         }
     }
 }
@@ -77,18 +101,23 @@ fn render_game(element: &HtmlCanvasElement, context: &CanvasRenderingContext2d) 
 
         context.save();
 
-        let (mid_width, mid_height) = (element.width() as f64 / 2.0, element.height() as f64 / 2.0);
-
         let player_coord = game_state.get_own_player_data();
 
+        let camera_pos = game_state.get_camera_pos();
         // drawing background color
         context
-            .translate(mid_width - player_coord.x, mid_height - player_coord.y)
+            .translate(-camera_pos.x, -camera_pos.y)
             .expect("failed to move camera");
 
+        let player_size = 40.0;
         for (player, coord) in &game_state.player_data {
             context.set_fill_style(&"red".into());
-            context.fill_rect(coord.x, coord.y, 40.0, 40.0);
+            context.fill_rect(
+                coord.x - player_size / 2.0,
+                coord.y - player_size / 2.0,
+                player_size,
+                player_size,
+            );
 
             context.set_fill_style(&"white".into());
             context
@@ -96,12 +125,21 @@ fn render_game(element: &HtmlCanvasElement, context: &CanvasRenderingContext2d) 
                 .expect("text could not be drawn");
         }
 
+        for bullet in &game_state.projectile_data {
+            context.set_fill_style(&"grey".into());
+            context.begin_path();
+            context
+                .arc(bullet.x, bullet.y, 5.0, 0.0, 2.0 * PI)
+                .expect("bullet could not be drawn");
+            context.fill();
+        }
+
         context.set_stroke_style(&"white".into());
         context.begin_path();
         context.move_to(player_coord.x, player_coord.y);
         context.line_to(
-            game_state.mouse_pos.x + player_coord.x - mid_width,
-            game_state.mouse_pos.y + player_coord.y - mid_height,
+            camera_pos.x + game_state.mouse_pos.x,
+            camera_pos.y + game_state.mouse_pos.y,
         );
         context.stroke();
 

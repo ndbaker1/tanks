@@ -1,4 +1,5 @@
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
+use tanks_core::shared_types::Vec2d;
 use wasm_bindgen::{prelude::*, JsCast};
 use web_sys::{CanvasRenderingContext2d, HtmlCanvasElement, WebSocket};
 
@@ -51,23 +52,26 @@ pub trait Canvas {
     fn get_2d_context(&self) -> CanvasRenderingContext2d;
 }
 
+pub fn get_window_bounds() -> Vec2d {
+    Vec2d {
+        x: window()
+            .inner_width()
+            .expect("valid window width")
+            .as_f64()
+            .unwrap_or_default(),
+        y: window()
+            .inner_height()
+            .expect("valid window height")
+            .as_f64()
+            .unwrap_or_default(),
+    }
+}
+
 impl Canvas for HtmlCanvasElement {
     fn set_fullscreen(&self) {
-        let (width, height) = (
-            window()
-                .inner_width()
-                .expect("valid window width")
-                .as_f64()
-                .unwrap_or_default(),
-            window()
-                .inner_height()
-                .expect("valid window height")
-                .as_f64()
-                .unwrap_or_default(),
-        );
-
-        self.set_width(width as u32);
-        self.set_height(height as u32);
+        let bounds = get_window_bounds();
+        self.set_width(bounds.x as u32);
+        self.set_height(bounds.y as u32);
     }
 
     fn add_js_listener(&self, event: &str, func: Box<dyn FnMut()>) {
@@ -103,20 +107,6 @@ pub fn start_animation_loop(mut draw_call: Box<dyn FnMut()>) {
     *g.borrow_mut() = Some(closure);
 
     request_animation_frame(g.borrow().as_ref().unwrap());
-}
-
-pub fn get_query_params() -> HashMap<String, String> {
-    window()
-        .location()
-        .search()
-        .expect("no search params")
-        .trim_start_matches("?")
-        .split("&")
-        .map(|pair| {
-            let vec = pair.split("=").collect::<Vec<&str>>();
-            (vec[0].to_string(), vec[1].to_string())
-        })
-        .collect()
 }
 
 pub fn get_websocket_uri(username: &str) -> String {
