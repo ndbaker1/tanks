@@ -1,7 +1,8 @@
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
-
 use wasm_bindgen::{prelude::*, JsCast};
-use web_sys::{CanvasRenderingContext2d, HtmlCanvasElement};
+use web_sys::{CanvasRenderingContext2d, HtmlCanvasElement, WebSocket};
+
+pub const WEBSOCKET_PATH: &str = "api/ws";
 
 pub fn window() -> web_sys::Window {
     web_sys::window().expect("no global `window` exists")
@@ -116,4 +117,36 @@ pub fn get_query_params() -> HashMap<String, String> {
             (vec[0].to_string(), vec[1].to_string())
         })
         .collect()
+}
+
+pub fn get_websocket_uri(username: &str) -> String {
+    let websocket_protocol = match window()
+        .location()
+        .protocol()
+        .expect("no valid protocol for url")
+        .contains("https")
+    {
+        true => "wss",
+        false => "ws",
+    };
+
+    format!(
+        "{}://{}/{}/{}",
+        websocket_protocol,
+        window().location().host().expect("no valid host for url"),
+        WEBSOCKET_PATH,
+        username,
+    )
+}
+
+/// Trait for an object that can be checked whether it is ready to use
+pub trait Background {
+    fn is_ready(&self) -> bool;
+}
+
+impl Background for WebSocket {
+    /// More readable way of checking that the READY_STATE of the websocket is OPEN
+    fn is_ready(&self) -> bool {
+        self.ready_state() == 1
+    }
 }

@@ -2,13 +2,13 @@ use std::collections::HashMap;
 use tanks_core::{server_types::ServerEvent, shared_types::Coord};
 use web_sys::{CanvasRenderingContext2d, HtmlCanvasElement};
 
-struct ProjectileData {}
+use crate::{CONNECTION_STATE, GAME_STATE};
 
 pub struct ClientGameState {
     pub id: String,
     pub mouse_pos: Coord,
     pub player_data: HashMap<String, Coord>,
-    projectile_data: Vec<ProjectileData>,
+    pub projectile_data: Vec<Coord>,
 }
 
 impl ClientGameState {
@@ -33,9 +33,9 @@ impl ClientGameState {
     }
 
     /// Get the Player Data corresponding to the current player using the saved id
-    pub fn get_own_player_data(&mut self) -> &mut Coord {
+    pub fn get_own_player_data(&self) -> &Coord {
         self.player_data
-            .get_mut(&self.id)
+            .get(&self.id)
             .expect("player did not have their own ")
     }
 }
@@ -56,47 +56,48 @@ pub fn handle_server_event(event: ServerEvent, game_state: &mut ClientGameState)
     }
 }
 
-pub fn render(
-    element: &HtmlCanvasElement,
-    context: &CanvasRenderingContext2d,
-    game_state: &mut ClientGameState,
-) {
-    context.save();
+pub fn render(element: &HtmlCanvasElement, context: &CanvasRenderingContext2d) {
+    GAME_STATE.with(|state| {
+        let game_state = state.borrow_mut();
 
-    let (mid_width, mid_height) = (element.width() as f64 / 2.0, element.height() as f64 / 2.0);
+        context.save();
 
-    let player_coord = game_state.get_own_player_data();
-    context
-        .translate(mid_width - player_coord.x, mid_height - player_coord.y)
-        .expect("failed to move camera");
+        let (mid_width, mid_height) = (element.width() as f64 / 2.0, element.height() as f64 / 2.0);
 
-    context.set_fill_style(&"#222".into());
-    context.fill_rect(
-        player_coord.x - mid_width,
-        player_coord.y - mid_height,
-        element.width().into(),
-        element.height().into(),
-    );
+        let player_coord = game_state.get_own_player_data();
 
-    for (player, coord) in &mut game_state.player_data {
-        context.set_fill_style(&"red".into());
-        context.fill_rect(coord.x, coord.y, 40.0, 40.0);
-
-        context.set_fill_style(&"white".into());
-        context.set_font("50px serif");
+        // drawing background color
         context
-            .fill_text(&player, coord.x, coord.y)
-            .expect("text could not be drawn");
-    }
+            .translate(mid_width - player_coord.x, mid_height - player_coord.y)
+            .expect("failed to move camera");
+        context.set_fill_style(&"#222".into());
+        context.fill_rect(
+            player_coord.x - mid_width,
+            player_coord.y - mid_height,
+            element.width().into(),
+            element.height().into(),
+        );
 
-    context.set_stroke_style(&"white".into());
-    context.begin_path();
-    context.move_to(
-        game_state.get_own_player_data().x,
-        game_state.get_own_player_data().y,
-    );
-    context.line_to(game_state.mouse_pos.x, game_state.mouse_pos.y);
-    context.stroke();
+        for (player, coord) in &game_state.player_data {
+            context.set_fill_style(&"red".into());
+            context.fill_rect(coord.x, coord.y, 40.0, 40.0);
 
-    context.restore();
+            context.set_fill_style(&"white".into());
+            context.set_font("50px serif");
+            context
+                .fill_text(&player, coord.x, coord.y)
+                .expect("text could not be drawn");
+        }
+
+        context.set_stroke_style(&"white".into());
+        context.begin_path();
+        context.move_to(
+            game_state.get_own_player_data().x,
+            game_state.get_own_player_data().y,
+        );
+        context.line_to(game_state.mouse_pos.x, game_state.mouse_pos.y);
+        context.stroke();
+
+        context.restore();
+    });
 }

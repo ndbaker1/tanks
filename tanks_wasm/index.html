@@ -4,14 +4,8 @@
 </style>
 <body>
 <script async type="module">
-  import init, { connect } from './tanks_wasm.js'
+  import init from './tanks_wasm.js'
   await init()
-
-  const secure = location.protocol.includes('https')
-  const createWebsocketUri = (path) =>
-    `${secure ? 'wss' : 'ws'}://${location.host}/${path}`
-
-  connect(createWebsocketUri('api/ws'))
 </script>
 </body>
 
