@@ -11,6 +11,7 @@ crate-type = ["cdylib", "rlib"]
 [dependencies]
 tanks_core = { path = "../tanks_core" }
 
+regex = "1"
 js-sys = "0.3.55"
 wasm-bindgen = "0.2.74"
 wee_alloc = "0.4.5"
