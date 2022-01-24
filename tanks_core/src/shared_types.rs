@@ -40,7 +40,7 @@ impl PlayerData {
     pub fn new() -> Self {
         Self {
             keys_down: HashSet::new(),
-            position: Vec2d { x: 0.0, y: 0.0 },
+            position: Vec2d::zero(),
         }
     }
 
@@ -51,7 +51,7 @@ impl PlayerData {
                 "A" | "ARROWLEFT" => Vec2d::from_direction(&Direction::West),
                 "S" | "ARROWDOWN" => Vec2d::from_direction(&Direction::South),
                 "D" | "ARROWRIGHT" => Vec2d::from_direction(&Direction::East),
-                _ => Vec2d { x: 0.0, y: 0.0 },
+                _ => Vec2d::zero(),
             };
             delta.scale(5.0);
             self.position.add(delta);
@@ -63,6 +63,12 @@ impl PlayerData {
 pub struct Vec2d {
     pub x: f64,
     pub y: f64,
+}
+
+impl Vec2d {
+    pub fn zero() -> Self {
+        Self { x: 0.0, y: 0.0 }
+    }
 }
 
 impl Vec2d {

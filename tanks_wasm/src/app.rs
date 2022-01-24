@@ -19,12 +19,8 @@ impl ClientGameState {
     pub fn new(id: &str) -> Self {
         Self {
             id: id.to_string(),
-            mouse_pos: Vec2d { x: 0.0, y: 0.0 },
-            player_data: {
-                let mut data = HashMap::new();
-                data.insert(id.to_string(), Vec2d { x: 0.0, y: 0.0 });
-                data
-            },
+            mouse_pos: Vec2d::zero(),
+            player_data: [(id.to_string(), Vec2d::zero())].into_iter().collect(),
             projectile_data: Vec::new(),
         }
     }
@@ -50,14 +46,7 @@ impl ClientGameState {
     ///
     /// This is the Top-Left coordinate
     pub fn get_camera_pos(&self) -> Vec2d {
-        let bounds = get_window_bounds();
-        let (mid_width, mid_height) = (bounds.x / 2.0, bounds.y / 2.0);
-        let player_coord = self.get_own_player_data();
-
-        Vec2d {
-            x: player_coord.x - mid_width,
-            y: player_coord.y - mid_height,
-        }
+        Vec2d::zero()
     }
 }
 
