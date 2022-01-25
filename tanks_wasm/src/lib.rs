@@ -1,13 +1,16 @@
 use app::{handle_server_event, render, ClientGameState};
-use regex::Regex;
+use audio::AUDIO;
+use login::process_login_keyevent;
 use std::panic;
 use std::{cell::RefCell, rc::Rc};
 use tanks_core::{server_types::ClientEvent, shared_types::Vec2d};
 use utils::*;
 use wasm_bindgen::{prelude::*, JsCast};
-use web_sys::{Event, HtmlCanvasElement, KeyboardEvent, MessageEvent, MouseEvent, WebSocket};
+use web_sys::*;
 
 pub mod app;
+pub mod audio;
+pub mod login;
 mod utils;
 
 #[derive(Default)]
@@ -22,11 +25,9 @@ thread_local! {
     /// encounter a permanent locking of the Data
     static GAME_STATE: RefCell<ClientGameState> = RefCell::new(ClientGameState::new(""));
 
+    /// The state of the websocket connection
     static CONNECTION_STATE: RefCell<ConnectionState> = RefCell::new(ConnectionState::default());
 
-    static USERNAME: RefCell<String> = RefCell::new(String::new());
-
-    static TEXT_MATCHER: Regex = Regex::new(r"^[a-zA-Z0-9]$").unwrap();
 }
 
 macro_rules! console_log {
@@ -100,7 +101,7 @@ fn setup_canvas() -> Rc<HtmlCanvasElement> {
         console_log!("resize");
         cloned_canvas_element.set_fullscreen();
     }) as Box<dyn FnMut(_)>);
-    window()
+    js_window()
         .add_event_listener_with_callback("resize", resize_callback.as_ref().unchecked_ref())
         .expect("failed to add listener");
     resize_callback.forget();
@@ -120,13 +121,15 @@ fn setup_window_listeners() {
             }
         })
     }) as Box<dyn FnMut(_)>);
-    window()
+    js_window()
         .add_event_listener_with_callback("mousemove", mousemove_callback.as_ref().unchecked_ref())
         .expect("failed to add listener");
     mousemove_callback.forget();
 
     // Mouse Click Click
     let click_callback = Closure::wrap(Box::new(move |_: MouseEvent| {
+        AUDIO.with(|a| a.borrow().get("song").unwrap().play());
+
         CONNECTION_STATE.with(|state| {
             if let Some(ws) = &state.borrow_mut().ws {
                 if ws.is_ready() {
@@ -140,7 +143,7 @@ fn setup_window_listeners() {
             }
         });
     }) as Box<dyn FnMut(_)>);
-    window()
+    js_window()
         .add_event_listener_with_callback("mousedown", click_callback.as_ref().unchecked_ref())
         .expect("failed to add listener");
     click_callback.forget();
@@ -161,31 +164,18 @@ fn setup_window_listeners() {
                             .expect("websocket sent");
                     }
                 }
-                None => USERNAME.with(|username| {
-                    let mut username = username.borrow_mut();
-                    let key = event.key();
-                    match key.as_str() {
-                        "Enter" => {
-                            let ws = WebSocket::new(&get_websocket_uri(&username))
-                                .expect("failed to connect to websocket");
-                            setup_websocket_listeners(&ws);
-                            connection_state.ws = Some(ws);
-                            GAME_STATE
-                                .with(|data| *data.borrow_mut() = ClientGameState::new(&username));
-                        }
-                        "Backspace" => {
-                            username.pop();
-                        }
-                        _ => match TEXT_MATCHER.with(|re| re.is_match(&key)) {
-                            true => username.push_str(&event.key()),
-                            false => {}
-                        },
+                None => {
+                    if let Some((username, ws)) = process_login_keyevent(event) {
+                        setup_websocket_listeners(&ws);
+                        connection_state.ws = Some(ws);
+                        GAME_STATE
+                            .with(|data| *data.borrow_mut() = ClientGameState::new(&username));
                     }
-                }),
+                }
             };
         });
     }) as Box<dyn FnMut(_)>);
-    window()
+    js_window()
         .add_event_listener_with_callback("keydown", keydown_callback.as_ref().unchecked_ref())
         .expect("failed to add listener");
     keydown_callback.forget();
@@ -205,7 +195,7 @@ fn setup_window_listeners() {
             }
         });
     }) as Box<dyn FnMut(_)>);
-    window()
+    js_window()
         .add_event_listener_with_callback("keyup", keyup_callback.as_ref().unchecked_ref())
         .expect("failed to add listener");
     keyup_callback.forget();

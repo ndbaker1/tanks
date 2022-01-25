@@ -1,6 +1,7 @@
 use crate::{
-    utils::{get_block_size, get_window_bounds, Prepared},
-    CONNECTION_STATE, GAME_STATE, USERNAME,
+    login::render_login,
+    utils::{get_block_size, Prepared},
+    CONNECTION_STATE, GAME_STATE,
 };
 use std::{collections::HashMap, f64::consts::PI};
 use tanks_core::{
@@ -143,30 +144,4 @@ fn render_game(context: &CanvasRenderingContext2d) {
 
         context.restore();
     });
-}
-
-fn render_login(context: &CanvasRenderingContext2d) {
-    context.set_text_align("center");
-
-    let bounds = get_window_bounds();
-    let (mid_width, mid_height) = (bounds.x / 2.0, bounds.y / 2.0);
-
-    context.set_fill_style(&"white".into());
-    context.set_font("32px monospace");
-
-    context
-        .fill_text("Enter a name:", mid_width, mid_height)
-        .expect("text could not be drawn");
-
-    context.set_font("18px monospace");
-    context
-        .fill_text("then press Enter", mid_width, mid_height * 1.9)
-        .expect("text could not be drawn");
-
-    USERNAME.with(|username| {
-        context.set_font("32px monospace");
-        context
-            .fill_text(&username.borrow_mut(), mid_width, mid_height + 50.0)
-            .expect("text could not be drawn");
-    })
 }

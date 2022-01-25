@@ -5,18 +5,18 @@ use web_sys::{CanvasRenderingContext2d, HtmlCanvasElement, WebSocket};
 
 pub const WEBSOCKET_PATH: &str = "api/ws";
 
-pub fn window() -> web_sys::Window {
+pub fn js_window() -> web_sys::Window {
     web_sys::window().expect("no global `window` exists")
 }
 
 pub fn request_animation_frame(f: &Closure<dyn FnMut()>) {
-    window()
+    js_window()
         .request_animation_frame(f.as_ref().unchecked_ref())
         .expect("should register `requestAnimationFrame` OK");
 }
 
 pub fn document() -> web_sys::Document {
-    window()
+    js_window()
         .document()
         .expect("should have a document on window")
 }
@@ -54,12 +54,12 @@ pub trait Canvas {
 
 pub fn get_window_bounds() -> Vec2d {
     Vec2d {
-        x: window()
+        x: js_window()
             .inner_width()
             .expect("valid window width")
             .as_f64()
             .unwrap_or_default(),
-        y: window()
+        y: js_window()
             .inner_height()
             .expect("valid window height")
             .as_f64()
@@ -111,7 +111,7 @@ pub fn start_animation_loop(mut draw_call: Box<dyn FnMut()>) {
 
 /// Fetch the appropriate websocket uri according to the protocol of the url
 pub fn get_websocket_uri(username: &str) -> String {
-    let websocket_protocol = match window()
+    let websocket_protocol = match js_window()
         .location()
         .protocol()
         .expect("no valid protocol for url")
@@ -124,7 +124,10 @@ pub fn get_websocket_uri(username: &str) -> String {
     format!(
         "{}://{}/{}/{}",
         websocket_protocol,
-        window().location().host().expect("no valid host for url"),
+        js_window()
+            .location()
+            .host()
+            .expect("no valid host for url"),
         WEBSOCKET_PATH,
         username,
     )
