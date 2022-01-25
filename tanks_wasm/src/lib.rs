@@ -1,6 +1,7 @@
 use app::{handle_server_event, render, ClientGameState};
 use audio::AUDIO;
 use login::process_login_keyevent;
+use socket::setup_websocket_listeners;
 use std::panic;
 use std::{cell::RefCell, rc::Rc};
 use tanks_core::{server_types::ClientEvent, shared_types::Vec2d};
@@ -11,6 +12,7 @@ use web_sys::*;
 pub mod app;
 pub mod audio;
 pub mod login;
+pub mod socket;
 mod utils;
 
 #[derive(Default)]
@@ -56,38 +58,6 @@ pub fn start() {
 
 fn setup_logging() {
     panic::set_hook(Box::new(console_error_panic_hook::hook));
-}
-
-/// Connects to the WebSocket using the username entered by the User
-fn setup_websocket_listeners(ws: &WebSocket) {
-    let onmessage_callback = Closure::wrap(Box::new(move |e: MessageEvent| {
-        match e.data().dyn_into::<js_sys::JsString>() {
-            Ok(event_message) => match serde_json::from_str(&event_message.as_string().unwrap()) {
-                Ok(event) => {
-                    GAME_STATE.with(|state| handle_server_event(event, &mut state.borrow_mut()))
-                }
-                Err(e) => console_log!("failed conversion into Server Event :: {}", e),
-            },
-            Err(_) => console_log!("what is that event? => {:#?}", e.data()),
-        }
-    }) as Box<dyn FnMut(_)>);
-    // set message event handler on WebSocket
-    ws.set_onmessage(Some(onmessage_callback.as_ref().unchecked_ref()));
-    // forget the callback to keep it alive
-    onmessage_callback.forget();
-
-    // Signal the server to place the client into a session
-    let cloned_ws = ws.clone();
-    let onopen_callback = Closure::wrap(Box::new(move |_: MessageEvent| {
-        if cloned_ws.is_ready() {
-            cloned_ws
-                .send_with_str(&serde_json::to_string(&ClientEvent::JoinSession).unwrap())
-                .unwrap();
-        }
-    }) as Box<dyn FnMut(_)>);
-    ws.set_onopen(Some(onopen_callback.as_ref().unchecked_ref()));
-    // forget the callback to keep it alive
-    onopen_callback.forget();
 }
 
 /// Canvas Listeners Setup
@@ -166,7 +136,10 @@ fn setup_window_listeners() {
                 }
                 None => {
                     if let Some((username, ws)) = process_login_keyevent(event) {
-                        setup_websocket_listeners(&ws);
+                        setup_websocket_listeners(&ws, |event| {
+                            GAME_STATE
+                                .with(|state| handle_server_event(event, &mut state.borrow_mut()))
+                        });
                         connection_state.ws = Some(ws);
                         GAME_STATE
                             .with(|data| *data.borrow_mut() = ClientGameState::new(&username));

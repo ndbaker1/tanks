@@ -1,11 +1,12 @@
 use std::{cell::RefCell, collections::HashMap};
 use web_sys::HtmlAudioElement;
 
+type SongMap = HashMap<String, HtmlAudioElement>;
+
 thread_local! {
     pub static AUDIO: RefCell<SongMap> = RefCell::new(create_song_map());
 }
 
-pub type SongMap = HashMap<String, HtmlAudioElement>;
 fn create_song_map() -> SongMap {
     let mut songs = HashMap::new();
 
