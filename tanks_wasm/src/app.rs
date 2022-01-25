@@ -1,7 +1,7 @@
 use crate::{
+    interface::{CONNECTION_STATE, GAME_STATE},
     login::render_login,
     utils::{get_block_size, Prepared},
-    CONNECTION_STATE, GAME_STATE,
 };
 use std::{collections::HashMap, f64::consts::PI};
 use tanks_core::{
@@ -84,64 +84,60 @@ pub fn render(element: &HtmlCanvasElement, context: &CanvasRenderingContext2d) {
     });
 
     match connected {
-        true => render_game(context),
+        true => GAME_STATE.with(|state| render_game(context, &state.borrow())),
         false => render_login(context),
     };
 }
 
-fn render_game(context: &CanvasRenderingContext2d) {
-    GAME_STATE.with(|state| {
-        let game_state = state.borrow_mut();
+fn render_game(context: &CanvasRenderingContext2d, game_state: &ClientGameState) {
+    context.save();
 
-        context.save();
+    let player_coord = game_state.get_own_player_data();
 
-        let player_coord = game_state.get_own_player_data();
+    let block_size = get_block_size();
 
-        let block_size = get_block_size();
-
-        let colors = ["#5C6784", "#1D263B"];
-        for col in 0..MAP_WIDTH {
-            for row in 0..MAP_HEIGHT {
-                context.set_fill_style(&colors[(col + row).rem_euclid(2)].into());
-                context.fill_rect(
-                    block_size * col as f64,
-                    block_size * row as f64,
-                    block_size,
-                    block_size,
-                );
-            }
-        }
-
-        for (player, coord) in &game_state.player_data {
-            context.set_fill_style(&"red".into());
+    let colors = ["#5C6784", "#1D263B"];
+    for col in 0..MAP_WIDTH {
+        for row in 0..MAP_HEIGHT {
+            context.set_fill_style(&colors[(col + row).rem_euclid(2)].into());
             context.fill_rect(
-                coord.x - block_size / 2.0,
-                coord.y - block_size / 2.0,
+                block_size * col as f64,
+                block_size * row as f64,
                 block_size,
                 block_size,
             );
-
-            context.set_fill_style(&"white".into());
-            context
-                .fill_text(&player, coord.x, coord.y)
-                .expect("text could not be drawn");
         }
+    }
 
-        for bullet in &game_state.projectile_data {
-            context.set_fill_style(&"grey".into());
-            context.begin_path();
-            context
-                .arc(bullet.x, bullet.y, block_size / 6.0, 0.0, 2.0 * PI)
-                .expect("bullet could not be drawn");
-            context.fill();
-        }
+    for (player, coord) in &game_state.player_data {
+        context.set_fill_style(&"red".into());
+        context.fill_rect(
+            coord.x - block_size / 2.0,
+            coord.y - block_size / 2.0,
+            block_size,
+            block_size,
+        );
 
-        context.set_stroke_style(&"white".into());
+        context.set_fill_style(&"white".into());
+        context
+            .fill_text(&player, coord.x, coord.y)
+            .expect("text could not be drawn");
+    }
+
+    for bullet in &game_state.projectile_data {
+        context.set_fill_style(&"grey".into());
         context.begin_path();
-        context.move_to(player_coord.x, player_coord.y);
-        context.line_to(game_state.mouse_pos.x, game_state.mouse_pos.y);
-        context.stroke();
+        context
+            .arc(bullet.x, bullet.y, block_size / 6.0, 0.0, 2.0 * PI)
+            .expect("bullet could not be drawn");
+        context.fill();
+    }
 
-        context.restore();
-    });
+    context.set_stroke_style(&"white".into());
+    context.begin_path();
+    context.move_to(player_coord.x, player_coord.y);
+    context.line_to(game_state.mouse_pos.x, game_state.mouse_pos.y);
+    context.stroke();
+
+    context.restore();
 }
