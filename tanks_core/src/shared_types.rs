@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 
 /// Trait for an Object that can update on the server Tick
-pub trait Tick {
+pub trait Tickable {
     /// Update the Object
     fn tick(&mut self) -> bool;
 }
@@ -15,15 +15,37 @@ pub const MAP_HEIGHT: usize = 12;
 /// Wall objects that should be drawn and collided with
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub enum Wall {
-    Indestructable,
-    Desructable,
+    Indestructable(usize),
+    Desructable(usize),
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct ServerGameState {
     pub players: HashMap<String, PlayerData>,
-    pub bullets: Vec<Bullet>,
     pub map: HashMap<(usize, usize), Wall>,
+}
+
+impl ServerGameState {
+    /// Get list of mutable  bullets from players
+    pub fn get_bullets_mut(&mut self) -> Vec<&mut Bullet> {
+        self.players
+            .iter_mut()
+            .flat_map(|(_, data)| &mut data.bullets)
+            .collect()
+    }
+
+    /// Get list of references bullets from players
+    pub fn get_bullets(&self) -> Vec<&Bullet> {
+        self.players
+            .iter()
+            .flat_map(|(_, data)| &data.bullets)
+            .collect()
+    }
+
+    /// Get list of references to player IDsdd
+    pub fn get_player_ids(&self) -> Vec<&String> {
+        self.players.iter().map(|(id, _)| id).collect()
+    }
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -36,7 +58,7 @@ pub struct Bullet {
     pub angle: f64,
 }
 
-impl Tick for Bullet {
+impl Tickable for Bullet {
     fn tick(&mut self) -> bool {
         self.pos.x += self.velocity.x;
         self.pos.y += self.velocity.y;
@@ -46,7 +68,8 @@ impl Tick for Bullet {
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub enum PlayerState {
-    Shooting,
+    /// Move Delay involved with shooting a bullet
+    Shooting(u32),
     Idle,
 }
 
@@ -56,13 +79,22 @@ pub struct PlayerData {
     pub state: PlayerState,
     pub position: Vec2d,
     pub keys_down: HashSet<String>,
+    pub bullets: Vec<Bullet>,
 }
 
-impl Tick for PlayerData {
+impl Tickable for PlayerData {
     fn tick(&mut self) -> bool {
-        if !self.keys_down.is_empty() {
-            self.move_based_on_keys();
-            return true;
+        if let PlayerState::Idle = self.state {
+            if !self.keys_down.is_empty() {
+                self.move_based_on_keys();
+                return true;
+            }
+        } else if let PlayerState::Shooting(dur) = &mut self.state {
+            if dur > &mut 0 {
+                *dur -= 1;
+            } else {
+                self.state = PlayerState::Idle;
+            }
         }
 
         false
@@ -76,6 +108,7 @@ impl PlayerData {
             state: PlayerState::Idle,
             keys_down: HashSet::new(),
             position: Vec2d::zero(),
+            bullets: Vec::new(),
         }
     }
 

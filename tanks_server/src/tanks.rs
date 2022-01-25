@@ -3,7 +3,7 @@ use serde_json::from_str;
 use std::{collections::HashMap, time::Duration};
 use tanks_core::{
     server_types::{ClientEvent, ServerEvent},
-    shared_types::{Bullet, PlayerData, ServerGameState, Tick, Vec2d},
+    shared_types::{Bullet, PlayerData, PlayerState, ServerGameState, Tickable, Vec2d},
 };
 use tokio::time::delay_for;
 use websocket_server::{
@@ -16,44 +16,57 @@ use websocket_server::{
 pub async fn tick_handler(clients: SafeClients, sessions: SafeSessions<ServerGameState>) {
     loop {
         for session in sessions.write().await.values_mut() {
-            for bullet in &mut session.data.bullets {
+            let game_data = &mut session.data;
+
+            // Tick all bullets
+            for bullet in game_data.get_bullets_mut() {
                 bullet.tick();
             }
 
-            for (client_id, _) in &session.client_statuses {
+            // Check Bullet Wall Collisions
+            for (_, data) in &mut game_data.players {
+                data.bullets.retain(|bullet| {
+                    bullet.pos.x > 0.0
+                        && bullet.pos.x < 1000.0
+                        && bullet.pos.y > 0.0
+                        && bullet.pos.y < 1000.0
+                });
+            }
+
+            // Check Bullet-to-Bullet collisions
+
+            // Relay Bullet data to each Player
+            for client_id in game_data.get_player_ids() {
+                let bullets = game_data.get_bullets();
+
+                let client_bullets = bullets
+                    .iter()
+                    .map(|bullet| (bullet.pos.clone(), bullet.angle.clone()));
+
                 if let Some(client) = clients.read().await.get(client_id) {
-                    message_client(
-                        client,
-                        &ServerEvent::BulletData(
-                            session
-                                .data
-                                .bullets
-                                .iter()
-                                .map(|bullet| (bullet.pos.clone(), bullet.angle))
-                                .collect(),
-                        ),
-                    );
+                    message_client(client, &ServerEvent::BulletData(client_bullets.collect()));
                 }
             }
 
-            let update_list =
-                session
-                    .data
-                    .players
-                    .iter_mut()
-                    .filter_map(|(player_id, player_data)| match player_data.tick() {
-                        true => Some((player_id, player_data)),
-                        false => None,
-                    });
+            // Update
+            let update_list: Vec<(String, Vec2d)> = game_data
+                .players
+                .iter_mut()
+                .filter_map(|(player_id, player_data)| match player_data.tick() {
+                    true => Some((player_id.clone(), player_data.position.clone())),
+                    false => None,
+                })
+                .collect();
 
+            // Update
             for (player_id, player_data) in update_list {
-                for (client_id, _) in &session.client_statuses {
+                for client_id in game_data.get_player_ids() {
                     if let Some(client) = clients.read().await.get(client_id) {
                         message_client(
                             client,
                             &ServerEvent::PlayerPosUpdate {
                                 player: player_id.clone(),
-                                coord: player_data.position.clone(),
+                                coord: player_data.clone(),
                             },
                         );
                     }
@@ -61,6 +74,7 @@ pub async fn tick_handler(clients: SafeClients, sessions: SafeSessions<ServerGam
             }
         }
 
+        // wait the tick on the server
         delay_for(Duration::from_millis(1000 / 60)).await;
     }
 }
@@ -96,16 +110,23 @@ pub async fn handle_event(
             let session_id = get_client_session_id(&client_id, &clients).await.unwrap();
 
             if let Some(session) = sessions.write().await.get_mut(&session_id) {
-                if let Some(player) = session.data.players.get(&client_id) {
-                    let bullet_speed = 10.0;
-                    session.data.bullets.push(Bullet {
-                        angle,
-                        pos: player.position.clone(),
-                        velocity: Vec2d {
-                            x: bullet_speed * angle.cos(),
-                            y: bullet_speed * angle.sin(),
-                        },
-                    });
+                if let Some(player) = session.data.players.get_mut(&client_id) {
+                    if let PlayerState::Idle = player.state {
+                        if player.bullets.len() < 5 {
+                            let bullet_speed = 10.0;
+
+                            player.bullets.push(Bullet {
+                                angle,
+                                pos: player.position.clone(),
+                                velocity: Vec2d {
+                                    x: bullet_speed * angle.cos(),
+                                    y: bullet_speed * angle.sin(),
+                                },
+                            });
+
+                            player.state = PlayerState::Shooting(5);
+                        }
+                    }
                 }
             }
         }
@@ -147,7 +168,6 @@ pub async fn create_session(
             players: [(String::from(client_id), PlayerData::new(client_id))]
                 .into_iter()
                 .collect(),
-            bullets: Vec::new(),
             map: HashMap::new(),
         },
     };
