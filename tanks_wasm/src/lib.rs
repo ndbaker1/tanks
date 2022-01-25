@@ -141,7 +141,7 @@ fn setup_window_listeners() {
         });
     }) as Box<dyn FnMut(_)>);
     window()
-        .add_event_listener_with_callback("click", click_callback.as_ref().unchecked_ref())
+        .add_event_listener_with_callback("mousedown", click_callback.as_ref().unchecked_ref())
         .expect("failed to add listener");
     click_callback.forget();
 
