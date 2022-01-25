@@ -69,6 +69,7 @@ pub fn handle_server_event(event: ServerEvent, game_state: &mut ClientGameState)
         ServerEvent::BulletData(bullets) => {
             game_state.projectile_data = bullets.into_iter().map(|(pos, _)| pos).collect()
         }
+        ServerEvent::BulletExplode(pos) => {}
     }
 }
 

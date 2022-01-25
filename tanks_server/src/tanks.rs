@@ -1,3 +1,4 @@
+use crate::utils::{process_collisions, VecOps};
 use nanoid::nanoid;
 use serde_json::from_str;
 use std::{collections::HashMap, time::Duration};
@@ -19,32 +20,48 @@ pub async fn tick_handler(clients: SafeClients, sessions: SafeSessions<ServerGam
             let game_data = &mut session.data;
 
             // Tick all bullets
-            for bullet in game_data.get_bullets_mut() {
+            for bullet in &mut game_data.bullets {
                 bullet.tick();
             }
 
             // Check Bullet Wall Collisions
-            for (_, data) in &mut game_data.players {
-                data.bullets.retain(|bullet| {
-                    bullet.pos.x > 0.0
-                        && bullet.pos.x < 1000.0
-                        && bullet.pos.y > 0.0
-                        && bullet.pos.y < 1000.0
+            game_data
+                .bullets
+                .drain_remove_if(|bullet| {
+                    bullet.pos.x < 0.0
+                        || bullet.pos.x > 1000.0
+                        || bullet.pos.y < 0.0
+                        || bullet.pos.y > 1000.0
+                })
+                .into_iter()
+                .for_each(|bullet| {
+                    if let Some(player) = game_data.players.get_mut(&bullet.player_id) {
+                        player.bullets_left += 1;
+                    }
                 });
-            }
 
-            // Check Bullet-to-Bullet collisions
+            for index in process_collisions(&game_data.bullets) {
+                let removed = game_data.bullets.remove(index);
+                if let Some(player) = game_data.players.get_mut(&removed.player_id) {
+                    player.bullets_left += 1;
+                }
+                for client_id in game_data.get_player_ids() {
+                    if let Some(client) = clients.read().await.get(client_id) {
+                        message_client(client, &ServerEvent::BulletExplode(removed.pos));
+                    }
+                }
+            }
 
             // Relay Bullet data to each Player
             for client_id in game_data.get_player_ids() {
-                let bullets = game_data.get_bullets();
-
-                let client_bullets = bullets
+                let bullets = game_data
+                    .bullets
                     .iter()
-                    .map(|bullet| (bullet.pos.clone(), bullet.angle.clone()));
+                    .map(|bullet| (bullet.pos, bullet.angle))
+                    .collect::<Vec<_>>();
 
                 if let Some(client) = clients.read().await.get(client_id) {
-                    message_client(client, &ServerEvent::BulletData(client_bullets.collect()));
+                    message_client(client, &ServerEvent::BulletData(bullets.clone()));
                 }
             }
 
@@ -112,10 +129,13 @@ pub async fn handle_event(
             if let Some(session) = sessions.write().await.get_mut(&session_id) {
                 if let Some(player) = session.data.players.get_mut(&client_id) {
                     if let PlayerState::Idle = player.state {
-                        if player.bullets.len() < 5 {
+                        if player.bullets_left > 0 {
                             let bullet_speed = 10.0;
 
-                            player.bullets.push(Bullet {
+                            player.bullets_left -= 1;
+
+                            session.data.bullets.push(Bullet {
+                                player_id: client_id.clone(),
                                 angle,
                                 pos: player.position.clone(),
                                 velocity: Vec2d {
@@ -124,7 +144,7 @@ pub async fn handle_event(
                                 },
                             });
 
-                            player.state = PlayerState::Shooting(5);
+                            player.state = PlayerState::Shooting(4);
                         }
                     }
                 }
@@ -169,6 +189,7 @@ pub async fn create_session(
                 .into_iter()
                 .collect(),
             map: HashMap::new(),
+            bullets: Vec::new(),
         },
     };
 

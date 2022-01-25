@@ -2,6 +2,7 @@ use std::env;
 use websocket_server::{server, ServerConfig};
 
 pub mod tanks;
+pub mod utils;
 
 #[tokio::main]
 async fn main() {

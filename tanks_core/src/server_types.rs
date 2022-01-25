@@ -8,6 +8,7 @@ use serde::{Deserialize, Serialize};
 pub enum ServerEvent {
     PlayerPosUpdate { player: String, coord: Vec2d },
     PlayerDisconnect { player: String },
+    BulletExplode(Vec2d),
     BulletData(Vec<(Vec2d, f64)>),
 }
 

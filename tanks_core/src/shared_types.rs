@@ -23,25 +23,10 @@ pub enum Wall {
 pub struct ServerGameState {
     pub players: HashMap<String, PlayerData>,
     pub map: HashMap<(usize, usize), Wall>,
+    pub bullets: Vec<Bullet>,
 }
 
 impl ServerGameState {
-    /// Get list of mutable  bullets from players
-    pub fn get_bullets_mut(&mut self) -> Vec<&mut Bullet> {
-        self.players
-            .iter_mut()
-            .flat_map(|(_, data)| &mut data.bullets)
-            .collect()
-    }
-
-    /// Get list of references bullets from players
-    pub fn get_bullets(&self) -> Vec<&Bullet> {
-        self.players
-            .iter()
-            .flat_map(|(_, data)| &data.bullets)
-            .collect()
-    }
-
     /// Get list of references to player IDsdd
     pub fn get_player_ids(&self) -> Vec<&String> {
         self.players.iter().map(|(id, _)| id).collect()
@@ -50,12 +35,25 @@ impl ServerGameState {
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct Bullet {
+    /// The ID of the player who created the bullet
+    pub player_id: String,
     /// Bullet Position
     pub pos: Vec2d,
     /// Speed of the Bullet
     pub velocity: Vec2d,
     /// Angle of the Bullet
     pub angle: f64,
+}
+
+impl Bullet {
+    pub fn collides_with(&self, other: &Bullet) -> bool {
+        let delta = Vec2d {
+            x: self.pos.x - other.pos.x,
+            y: self.pos.y - other.pos.y,
+        };
+
+        delta.x * delta.x + delta.y * delta.y < 400.0
+    }
 }
 
 impl Tickable for Bullet {
@@ -73,13 +71,15 @@ pub enum PlayerState {
     Idle,
 }
 
+pub const BULLET_COUNT: u8 = 5;
+
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct PlayerData {
     pub id: String,
     pub state: PlayerState,
     pub position: Vec2d,
     pub keys_down: HashSet<String>,
-    pub bullets: Vec<Bullet>,
+    pub bullets_left: u8,
 }
 
 impl Tickable for PlayerData {
@@ -108,7 +108,7 @@ impl PlayerData {
             state: PlayerState::Idle,
             keys_down: HashSet::new(),
             position: Vec2d::zero(),
-            bullets: Vec::new(),
+            bullets_left: BULLET_COUNT,
         }
     }
 
@@ -127,7 +127,7 @@ impl PlayerData {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, Copy)]
 pub struct Vec2d {
     pub x: f64,
     pub y: f64,
