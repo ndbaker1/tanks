@@ -1,6 +1,5 @@
 use crate::{
     app::{handle_server_event, ClientGameState},
-    audio::AUDIO,
     log,
     login::process_login_keyevent,
     socket::setup_websocket_listeners,
@@ -70,8 +69,6 @@ pub fn setup_window_listeners() {
 
     // Mouse Click Click
     let click_callback = Closure::wrap(Box::new(move |_: MouseEvent| {
-        AUDIO.with(|a| a.borrow().get("song").unwrap().play());
-
         CONNECTION_STATE.with(|state| {
             if let Some(ws) = &state.borrow_mut().ws {
                 if ws.is_ready() {

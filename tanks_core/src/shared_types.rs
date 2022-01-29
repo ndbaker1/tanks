@@ -1,3 +1,4 @@
+use crate::{BULLET_COUNT, BULLET_SIZE, PLAYER_SPEED};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 
@@ -47,7 +48,7 @@ impl Bullet {
             y: self.pos.y - other.pos.y,
         };
 
-        delta.x * delta.x + delta.y * delta.y < 400.0
+        delta.x * delta.x + delta.y * delta.y < BULLET_SIZE * BULLET_SIZE
     }
 }
 
@@ -65,8 +66,6 @@ pub enum PlayerState {
     Shooting(u32),
     Idle,
 }
-
-pub const BULLET_COUNT: u8 = 5;
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct PlayerData {
@@ -108,16 +107,27 @@ impl PlayerData {
     }
 
     pub fn move_based_on_keys(&mut self) {
+        let mut delta = Vec2d::zero();
         for key in &self.keys_down {
-            let mut delta = match key.as_str() {
-                "W" | "ARROWUP" => Vec2d::from_direction(&Direction::North),
-                "A" | "ARROWLEFT" => Vec2d::from_direction(&Direction::West),
-                "S" | "ARROWDOWN" => Vec2d::from_direction(&Direction::South),
-                "D" | "ARROWRIGHT" => Vec2d::from_direction(&Direction::East),
-                _ => Vec2d::zero(),
+            match key.as_str() {
+                "W" | "ARROWUP" => {
+                    delta.add(&Vec2d::from_direction(&Direction::North));
+                }
+                "A" | "ARROWLEFT" => {
+                    delta.add(&Vec2d::from_direction(&Direction::West));
+                }
+                "S" | "ARROWDOWN" => {
+                    delta.add(&Vec2d::from_direction(&Direction::South));
+                }
+                "D" | "ARROWRIGHT" => {
+                    delta.add(&Vec2d::from_direction(&Direction::East));
+                }
+                _ => {}
             };
-            self.position.add(delta);
         }
+        delta.normalize().scale(PLAYER_SPEED);
+
+        self.position.add(&delta);
     }
 }
 
@@ -134,14 +144,29 @@ impl Vec2d {
 }
 
 impl Vec2d {
-    pub fn add(&mut self, coord: Vec2d) {
+    pub fn add(&mut self, coord: &Vec2d) -> &mut Self {
         self.x += coord.x;
         self.y += coord.y;
+        self
     }
 
-    pub fn scale(&mut self, factor: f64) {
+    pub fn scale(&mut self, factor: f64) -> &mut Self {
         self.x *= factor;
         self.y *= factor;
+        self
+    }
+
+    pub fn normalize(&mut self) -> &mut Self {
+        let mag = self.magnitude();
+        if mag > 0.0 {
+            self.x /= mag;
+            self.y /= mag;
+        }
+        self
+    }
+
+    pub fn magnitude(&self) -> f64 {
+        (self.x * self.x + self.y * self.y).sqrt()
     }
 
     pub fn from_direction(dir: &Direction) -> Self {

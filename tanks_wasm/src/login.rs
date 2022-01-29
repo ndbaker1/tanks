@@ -41,19 +41,19 @@ pub fn render_login(context: &CanvasRenderingContext2d) {
     let (mid_width, mid_height) = (bounds.x / 2.0, bounds.y / 2.0);
 
     context.set_fill_style(&"white".into());
-    context.set_font("32px monospace");
+    context.set_font("3em monospace");
 
     context
         .fill_text("Enter a name:", mid_width, mid_height)
         .expect("text could not be drawn");
 
-    context.set_font("18px monospace");
+    context.set_font("1.5em monospace");
     context
         .fill_text("then press Enter", mid_width, mid_height * 1.9)
         .expect("text could not be drawn");
 
     USERNAME.with(|username| {
-        context.set_font("32px monospace");
+        context.set_font("3em monospace");
         context
             .fill_text(&username.borrow_mut(), mid_width, mid_height + 50.0)
             .expect("text could not be drawn");

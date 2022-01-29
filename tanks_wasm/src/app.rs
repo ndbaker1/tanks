@@ -4,7 +4,9 @@ use crate::{
     utils::{get_block_size, Prepared},
 };
 use std::{collections::HashMap, f64::consts::PI};
-use tanks_core::{server_types::ServerEvent, shared_types::Vec2d, MAP_HEIGHT, MAP_WIDTH};
+use tanks_core::{
+    server_types::ServerEvent, shared_types::Vec2d, BULLET_SIZE, MAP_HEIGHT, MAP_WIDTH,
+};
 use web_sys::{CanvasRenderingContext2d, HtmlCanvasElement};
 
 pub struct ClientPlayerData {}
@@ -53,7 +55,8 @@ impl ClientGameState {
 
 pub fn handle_server_event(event: ServerEvent, game_state: &mut ClientGameState) {
     match event {
-        ServerEvent::PlayerPosUpdate { coord, player } => {
+        ServerEvent::PlayerPosUpdate { mut coord, player } => {
+            coord.scale(get_block_size());
             // either update the player or add them
             if let Some(player_data) = game_state.player_data.get_mut(&player) {
                 *player_data = coord;
@@ -65,7 +68,13 @@ pub fn handle_server_event(event: ServerEvent, game_state: &mut ClientGameState)
             game_state.player_data.remove(&player);
         }
         ServerEvent::BulletData(bullets) => {
-            game_state.projectile_data = bullets.into_iter().map(|(pos, _)| pos).collect()
+            game_state.projectile_data = bullets
+                .into_iter()
+                .map(|(mut pos, _)| {
+                    pos.scale(get_block_size());
+                    pos
+                })
+                .collect()
         }
         ServerEvent::BulletExplode(pos) => {}
     }
@@ -115,6 +124,10 @@ fn render_game(context: &CanvasRenderingContext2d, game_state: &ClientGameState)
             block_size,
         );
 
+        // I think we want this to be a fixed pixel size so that you can always see the name
+        context.set_font("40px monospace");
+        context.set_text_align("center");
+
         context.set_fill_style(&"white".into());
         context
             .fill_text(&player, coord.x, coord.y)
@@ -125,7 +138,7 @@ fn render_game(context: &CanvasRenderingContext2d, game_state: &ClientGameState)
         context.set_fill_style(&"grey".into());
         context.begin_path();
         context
-            .arc(bullet.x, bullet.y, block_size / 6.0, 0.0, 2.0 * PI)
+            .arc(bullet.x, bullet.y, block_size * BULLET_SIZE, 0.0, 2.0 * PI)
             .expect("bullet could not be drawn");
         context.fill();
     }

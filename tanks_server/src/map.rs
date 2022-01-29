@@ -17,7 +17,7 @@ pub fn parse_maps(filepath: &str) -> Vec<MapData> {
 
     let file_lines = BufReader::new(File::open(filepath).expect("failed to open mapdata file"))
         .lines()
-        .filter_map(|a| match a {
+        .filter_map(|line_result| match line_result {
             Ok(line) => Some(line),
             _ => None,
         });

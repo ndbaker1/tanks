@@ -9,6 +9,7 @@ use std::{collections::HashMap, time::Duration};
 use tanks_core::{
     server_types::{ClientEvent, ServerEvent},
     shared_types::{Bullet, PlayerData, PlayerState, ServerGameState, Tickable, Vec2d},
+    BULLET_SPEED, MAP_HEIGHT, MAP_WIDTH,
 };
 use tokio::time::delay_for;
 use websocket_server::{
@@ -38,9 +39,9 @@ pub async fn tick_handler(clients: SafeClients, sessions: SafeSessions<ServerGam
                 .bullets
                 .drain_remove_if(|bullet| {
                     bullet.pos.x < 0.0
-                        || bullet.pos.x > 1000.0
+                        || bullet.pos.x > MAP_WIDTH as f64
                         || bullet.pos.y < 0.0
-                        || bullet.pos.y > 1000.0
+                        || bullet.pos.y > MAP_HEIGHT as f64
                 })
                 .into_iter()
                 .for_each(|bullet| {
@@ -139,8 +140,6 @@ pub async fn handle_event(
                 if let Some(player) = session.data.players.get_mut(&client_id) {
                     if let PlayerState::Idle = player.state {
                         if player.bullets_left > 0 {
-                            let bullet_speed = 10.0;
-
                             player.bullets_left -= 1;
 
                             session.data.bullets.push(Bullet {
@@ -148,8 +147,8 @@ pub async fn handle_event(
                                 angle,
                                 pos: player.position.clone(),
                                 velocity: Vec2d {
-                                    x: bullet_speed * angle.cos(),
-                                    y: bullet_speed * angle.sin(),
+                                    x: BULLET_SPEED * angle.cos(),
+                                    y: BULLET_SPEED * angle.sin(),
                                 },
                             });
 

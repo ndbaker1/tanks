@@ -145,6 +145,7 @@ impl Prepared for WebSocket {
     }
 }
 
+/// Get the Square Unit size based on the current screen dimensions
 pub fn get_block_size() -> f64 {
     let bounds = get_window_bounds();
     (bounds.x / MAP_WIDTH as f64).min(bounds.y / MAP_HEIGHT as f64)

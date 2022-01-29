@@ -19,7 +19,11 @@ pub fn setup_websocket_listeners<F: Fn(ServerEvent) + 'static>(ws: &WebSocket, e
         match e.data().dyn_into::<js_sys::JsString>() {
             Ok(event_message) => match serde_json::from_str(&event_message.as_string().unwrap()) {
                 Ok(event) => event_handler(event),
-                Err(e) => console_log!("failed conversion into Server Event :: {}", e),
+                Err(e) => console_log!(
+                    "failed conversion into Server Event :: {} :: {}",
+                    e,
+                    event_message
+                ),
             },
             Err(_) => console_log!("what is that event? => {:#?}", e.data()),
         }
