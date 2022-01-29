@@ -10,7 +10,7 @@ pub trait Tickable {
 
 /// Wall objects that should be drawn and collided with
 #[derive(Deserialize, Serialize, Debug, Clone)]
-pub enum Wall {
+pub enum Tile {
     Indestructable(usize),
     Desructable(usize),
 }
@@ -18,7 +18,7 @@ pub enum Wall {
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct ServerGameState {
     pub players: HashMap<String, PlayerData>,
-    pub map: HashMap<(usize, usize), Wall>,
+    pub map: HashMap<(usize, usize), Tile>,
     pub bullets: Vec<Bullet>,
 }
 

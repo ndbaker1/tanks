@@ -18,7 +18,7 @@ use websocket_server::{
 
 lazy_static! {
     /// Global Reference to MapData loaded at the beginning of the server
-    static ref MAPS: Vec<MapData> = parse_maps("assets/mapdata.mf");
+    static ref MAPS: HashMap<String, MapData> = parse_maps("assets/mapdata.mf");
 }
 
 /// The handler for game logic on the server

@@ -1,18 +1,35 @@
 use std::{
+    collections::HashMap,
     fs::File,
     io::{BufRead, BufReader},
 };
-use tanks_core::{MAP_HEIGHT, MAP_WIDTH};
+use tanks_core::shared_types::Tile;
 
-const MAP_INDICATOR: char = '@';
+/// Character to denote the start and end of a map in a MapData file
+///
+/// # Example
+///
+/// file contents:
+/// ```plaintext
+/// @MAP_NAME
+/// ..........
+/// ..x11.x1..
+/// ..........
+/// ..........
+/// @
+/// ```
+///
+/// you can have multiple definitions of a map in a single map file
+///
+const MAP_DELIMITER: char = '@';
 
 #[derive(Clone, Default, Debug)]
 pub struct MapData {
-    pub map: Vec<Vec<usize>>,
     pub name: String,
+    pub tile_data: HashMap<(usize, usize), Tile>,
 }
 
-pub fn parse_maps(filepath: &str) -> Vec<MapData> {
+pub fn parse_maps(filepath: &str) -> HashMap<String, MapData> {
     log::info!("loading maps..");
 
     let file_lines = BufReader::new(File::open(filepath).expect("failed to open mapdata file"))
@@ -22,20 +39,21 @@ pub fn parse_maps(filepath: &str) -> Vec<MapData> {
             _ => None,
         });
 
-    let mut maps = Vec::new();
+    let mut maps = HashMap::new();
     let mut reading = false;
     let mut current_data = MapData::default();
     for (row, line) in file_lines.enumerate() {
-        if line.starts_with(MAP_INDICATOR) {
+        if line.starts_with(MAP_DELIMITER) {
             match reading {
                 true => {
                     log::info!("map :: {:#?}", current_data);
-                    maps.push(current_data.clone());
+                    maps.insert(current_data.name.clone(), current_data.clone());
                 }
                 false => {
-                    let name = String::from(&line[1..]);
-                    let map = vec![vec![0; MAP_WIDTH]; MAP_HEIGHT];
-                    current_data = MapData { name, map };
+                    current_data = MapData {
+                        name: String::from(&line[1..]),
+                        tile_data: HashMap::new(),
+                    };
                 }
             };
 
