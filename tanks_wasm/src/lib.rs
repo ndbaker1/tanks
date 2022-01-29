@@ -31,6 +31,7 @@ pub fn start() {
     start_animation_loop(Box::new(draw_procedure));
 }
 
+/// Setup the panic hook and any other logging details
 fn setup_logging() {
     panic::set_hook(Box::new(console_error_panic_hook::hook));
 }

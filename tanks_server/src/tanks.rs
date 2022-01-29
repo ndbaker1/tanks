@@ -1,4 +1,8 @@
-use crate::utils::{process_collisions, VecOps};
+use crate::{
+    map::{parse_maps, MapData},
+    utils::{process_collisions, VecOps},
+};
+use lazy_static::lazy_static;
 use nanoid::nanoid;
 use serde_json::from_str;
 use std::{collections::HashMap, time::Duration};
@@ -10,6 +14,11 @@ use tokio::time::delay_for;
 use websocket_server::{
     cleanup_session, message_client, sessions::Session, SafeClients, SafeSessions,
 };
+
+lazy_static! {
+    /// Global Reference to MapData loaded at the beginning of the server
+    static ref MAPS: Vec<MapData> = parse_maps("assets/mapdata.mf");
+}
 
 /// The handler for game logic on the server
 ///

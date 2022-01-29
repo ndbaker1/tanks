@@ -7,11 +7,6 @@ pub trait Tickable {
     fn tick(&mut self) -> bool;
 }
 
-/// The number of squares in the map horizontally
-pub const MAP_WIDTH: usize = 24;
-/// The number of squares in the map vertically
-pub const MAP_HEIGHT: usize = 12;
-
 /// Wall objects that should be drawn and collided with
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub enum Wall {
@@ -27,7 +22,7 @@ pub struct ServerGameState {
 }
 
 impl ServerGameState {
-    /// Get list of references to player IDsdd
+    /// Get list of references to player ID
     pub fn get_player_ids(&self) -> Vec<&String> {
         self.players.iter().map(|(id, _)| id).collect()
     }
@@ -121,7 +116,6 @@ impl PlayerData {
                 "D" | "ARROWRIGHT" => Vec2d::from_direction(&Direction::East),
                 _ => Vec2d::zero(),
             };
-            delta.scale(5.0);
             self.position.add(delta);
         }
     }

@@ -4,10 +4,7 @@ use crate::{
     utils::{get_block_size, Prepared},
 };
 use std::{collections::HashMap, f64::consts::PI};
-use tanks_core::{
-    server_types::ServerEvent,
-    shared_types::{Vec2d, MAP_HEIGHT, MAP_WIDTH},
-};
+use tanks_core::{server_types::ServerEvent, shared_types::Vec2d, MAP_HEIGHT, MAP_WIDTH};
 use web_sys::{CanvasRenderingContext2d, HtmlCanvasElement};
 
 pub struct ClientPlayerData {}

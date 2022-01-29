@@ -1,5 +1,5 @@
 use std::{cell::RefCell, rc::Rc};
-use tanks_core::shared_types::{Vec2d, MAP_HEIGHT, MAP_WIDTH};
+use tanks_core::{shared_types::Vec2d, MAP_HEIGHT, MAP_WIDTH};
 use wasm_bindgen::{prelude::*, JsCast};
 use web_sys::{CanvasRenderingContext2d, HtmlCanvasElement, WebSocket};
 
