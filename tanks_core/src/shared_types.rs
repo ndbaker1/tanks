@@ -15,10 +15,12 @@ pub enum Tile {
     Desructable(usize),
 }
 
+pub type MapLandmarks = HashMap<(usize, usize), Tile>;
+
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct ServerGameState {
     pub players: HashMap<String, PlayerData>,
-    pub map: HashMap<(usize, usize), Tile>,
+    pub map: MapLandmarks,
     pub bullets: Vec<Bullet>,
 }
 

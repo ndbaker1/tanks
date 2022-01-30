@@ -5,7 +5,9 @@ use crate::{
 };
 use std::{collections::HashMap, f64::consts::PI};
 use tanks_core::{
-    server_types::ServerEvent, shared_types::Vec2d, BULLET_SIZE, MAP_HEIGHT, MAP_WIDTH,
+    server_types::ServerEvent,
+    shared_types::{MapLandmarks, Vec2d},
+    BULLET_SIZE, MAP_HEIGHT, MAP_WIDTH,
 };
 use web_sys::{CanvasRenderingContext2d, HtmlCanvasElement};
 
@@ -17,6 +19,7 @@ pub struct ClientGameState {
     pub mouse_pos: Vec2d,
     pub player_data: HashMap<String, Vec2d>,
     pub projectile_data: Vec<Vec2d>,
+    pub map_landmarks: MapLandmarks,
 }
 
 impl ClientGameState {
@@ -26,6 +29,7 @@ impl ClientGameState {
             mouse_pos: Vec2d::zero(),
             player_data: [(String::from(id), Vec2d::zero())].into_iter().collect(),
             projectile_data: Vec::new(),
+            map_landmarks: HashMap::new(),
         }
     }
 
@@ -77,6 +81,11 @@ pub fn handle_server_event(event: ServerEvent, game_state: &mut ClientGameState)
                 .collect()
         }
         ServerEvent::BulletExplode(pos) => {}
+        ServerEvent::MapUpdate(tile_updates) => {
+            for (key, value) in tile_updates {
+                game_state.map_landmarks.insert(key, value);
+            }
+        }
     }
 }
 
@@ -106,6 +115,14 @@ fn render_game(context: &CanvasRenderingContext2d, game_state: &ClientGameState)
     for col in 0..MAP_WIDTH {
         for row in 0..MAP_HEIGHT {
             context.set_fill_style(&colors[(col + row).rem_euclid(2)].into());
+
+            match game_state.map_landmarks.get(&(col, row)) {
+                Some(tile) => {
+                    context.set_fill_style(&"pruple".into());
+                }
+                None => {}
+            };
+
             context.fill_rect(
                 block_size * col as f64,
                 block_size * row as f64,

@@ -16,6 +16,7 @@ COPY . .
 RUN cargo run -p pack-wasm
 
 FROM scratch as deployment
+COPY assets .
 COPY --from=wasm /home/rust/src/dist dist
 COPY --from=server /home/rust/src/target/release/tanks_server .
 ENV RUST_LOG=info

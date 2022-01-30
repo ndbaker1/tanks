@@ -3,7 +3,7 @@ use std::{
     fs::File,
     io::{BufRead, BufReader},
 };
-use tanks_core::shared_types::Tile;
+use tanks_core::shared_types::{MapLandmarks, Tile};
 
 /// Character to denote the start and end of a map in a MapData file
 ///
@@ -26,7 +26,7 @@ const MAP_DELIMITER: char = '@';
 #[derive(Clone, Default, Debug)]
 pub struct MapData {
     pub name: String,
-    pub tile_data: HashMap<(usize, usize), Tile>,
+    pub tile_data: MapLandmarks,
 }
 
 pub fn parse_maps(filepath: &str) -> HashMap<String, MapData> {
@@ -62,9 +62,16 @@ pub fn parse_maps(filepath: &str) -> HashMap<String, MapData> {
             for (col, sym) in line.chars().enumerate() {
                 match sym {
                     '1'..='9' => {
-                        let elevation = sym.to_digit(10).unwrap();
+                        let elevation = sym.to_digit(10).unwrap() as usize;
+                        current_data
+                            .tile_data
+                            .insert((col, row), Tile::Indestructable(elevation));
                     }
-                    'x' => {}
+                    'x' => {
+                        current_data
+                            .tile_data
+                            .insert((col, row), Tile::Desructable(2));
+                    }
                     _ => {}
                 };
             }

@@ -1,7 +1,5 @@
-use crate::shared_types::Vec2d;
-/**
- * This file contains type defintions which are shared between the front and back end applications
- */
+/// This file contains type defintions which are shared between the front and back end applications
+use crate::shared_types::{MapLandmarks, Vec2d};
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize)]
@@ -10,6 +8,7 @@ pub enum ServerEvent {
     PlayerDisconnect { player: String },
     BulletExplode(Vec2d),
     BulletData(Vec<(Vec2d, f64)>),
+    MapUpdate(MapLandmarks),
 }
 
 #[derive(Serialize, Deserialize)]
