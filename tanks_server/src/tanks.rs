@@ -1,12 +1,10 @@
-use crate::{
-    map::{parse_maps, MapData},
-    utils::{process_collisions, VecOps},
-};
+use crate::utils::{process_collisions, VecOps};
 use lazy_static::lazy_static;
 use nanoid::nanoid;
 use serde_json::from_str;
 use std::{collections::HashMap, time::Duration};
 use tanks_core::{
+    map::{parse_maps, MapData},
     server_types::{ClientEvent, ServerEvent},
     shared_types::{Bullet, PlayerData, PlayerState, ServerGameState, Tickable, Vec2d},
     BULLET_SPEED, MAP_HEIGHT, MAP_WIDTH,
@@ -166,7 +164,15 @@ pub async fn handle_event(
             log::info!("request from <{}> to join a session", client_id);
             // place player in first valid session
             for session in sessions.write().await.values_mut() {
-                return insert_client_into_given_session(&client_id, &clients, session).await;
+                insert_client_into_given_session(&client_id, &clients, session).await;
+                if let Some(client) = clients.read().await.get(&client_id) {
+                    log::warn!("sending map");
+                    message_client(
+                        client,
+                        &ServerEvent::MapUpdate(MAPS.get("first").unwrap().tile_data.clone()),
+                    );
+                }
+                return;
             }
 
             create_session(&client_id, None, &sessions, &clients).await;

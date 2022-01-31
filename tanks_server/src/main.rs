@@ -1,7 +1,6 @@
 use std::env;
 use websocket_server::{server, ServerConfig};
 
-pub mod map;
 pub mod tanks;
 pub mod utils;
 

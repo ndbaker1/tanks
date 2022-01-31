@@ -5,9 +5,8 @@ use crate::{
 };
 use std::{collections::HashMap, f64::consts::PI};
 use tanks_core::{
-    server_types::ServerEvent,
-    shared_types::{MapLandmarks, Vec2d},
-    BULLET_SIZE, MAP_HEIGHT, MAP_WIDTH,
+    map::MapData, server_types::ServerEvent, shared_types::Vec2d, BULLET_SIZE, MAP_HEIGHT,
+    MAP_WIDTH,
 };
 use web_sys::{CanvasRenderingContext2d, HtmlCanvasElement};
 
@@ -19,7 +18,7 @@ pub struct ClientGameState {
     pub mouse_pos: Vec2d,
     pub player_data: HashMap<String, Vec2d>,
     pub projectile_data: Vec<Vec2d>,
-    pub map_landmarks: MapLandmarks,
+    pub map_landmarks: MapData,
 }
 
 impl ClientGameState {
@@ -29,16 +28,15 @@ impl ClientGameState {
             mouse_pos: Vec2d::zero(),
             player_data: [(String::from(id), Vec2d::zero())].into_iter().collect(),
             projectile_data: Vec::new(),
-            map_landmarks: HashMap::new(),
+            map_landmarks: MapData::default(),
         }
     }
 
     /// Gets the angle of the player to the mouse
     pub fn get_mouse_angle(&self) -> f64 {
-        let camera_pos = self.get_camera_pos();
         let player_pos = self.get_own_player_data();
-        let delta_x = camera_pos.x + self.mouse_pos.x - player_pos.x;
-        let delta_y = camera_pos.y + self.mouse_pos.y - player_pos.y;
+        let delta_x = self.mouse_pos.x - player_pos.x;
+        let delta_y = self.mouse_pos.y - player_pos.y;
         (delta_y).atan2(delta_x)
     }
 
@@ -82,8 +80,10 @@ pub fn handle_server_event(event: ServerEvent, game_state: &mut ClientGameState)
         }
         ServerEvent::BulletExplode(pos) => {}
         ServerEvent::MapUpdate(tile_updates) => {
-            for (key, value) in tile_updates {
-                game_state.map_landmarks.insert(key, value);
+            for (col, columns) in tile_updates {
+                for (row, tile) in columns {
+                    game_state.map_landmarks.insert(col, row, tile);
+                }
             }
         }
     }
@@ -116,12 +116,12 @@ fn render_game(context: &CanvasRenderingContext2d, game_state: &ClientGameState)
         for row in 0..MAP_HEIGHT {
             context.set_fill_style(&colors[(col + row).rem_euclid(2)].into());
 
-            match game_state.map_landmarks.get(&(col, row)) {
-                Some(tile) => {
-                    context.set_fill_style(&"pruple".into());
-                }
-                None => {}
-            };
+            if let Some(column) = game_state.map_landmarks.tile_data.get(&col) {
+                match column.get(&row) {
+                    Some(_) => context.set_fill_style(&"purple".into()),
+                    None => (),
+                };
+            }
 
             context.fill_rect(
                 block_size * col as f64,

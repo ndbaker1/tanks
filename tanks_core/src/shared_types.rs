@@ -15,7 +15,7 @@ pub enum Tile {
     Desructable(usize),
 }
 
-pub type MapLandmarks = HashMap<(usize, usize), Tile>;
+pub type MapLandmarks = HashMap<usize, HashMap<usize, Tile>>;
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct ServerGameState {

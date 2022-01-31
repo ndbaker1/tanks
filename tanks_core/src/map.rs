@@ -1,9 +1,9 @@
+use crate::shared_types::{MapLandmarks, Tile};
 use std::{
     collections::HashMap,
     fs::File,
     io::{BufRead, BufReader},
 };
-use tanks_core::shared_types::{MapLandmarks, Tile};
 
 /// Character to denote the start and end of a map in a MapData file
 ///
@@ -29,9 +29,16 @@ pub struct MapData {
     pub tile_data: MapLandmarks,
 }
 
-pub fn parse_maps(filepath: &str) -> HashMap<String, MapData> {
-    log::info!("loading maps..");
+impl MapData {
+    pub fn insert(&mut self, col: usize, row: usize, val: Tile) {
+        if !self.tile_data.contains_key(&col) {
+            self.tile_data.insert(col, HashMap::new());
+        }
+        self.tile_data.get_mut(&col).unwrap().insert(row, val);
+    }
+}
 
+pub fn parse_maps(filepath: &str) -> HashMap<String, MapData> {
     let file_lines = BufReader::new(File::open(filepath).expect("failed to open mapdata file"))
         .lines()
         .filter_map(|line_result| match line_result {
@@ -46,14 +53,13 @@ pub fn parse_maps(filepath: &str) -> HashMap<String, MapData> {
         if line.starts_with(MAP_DELIMITER) {
             match reading {
                 true => {
-                    log::info!("map :: {:#?}", current_data);
                     maps.insert(current_data.name.clone(), current_data.clone());
                 }
                 false => {
                     current_data = MapData {
                         name: String::from(&line[1..]),
                         tile_data: HashMap::new(),
-                    };
+                    }
                 }
             };
 
@@ -63,16 +69,12 @@ pub fn parse_maps(filepath: &str) -> HashMap<String, MapData> {
                 match sym {
                     '1'..='9' => {
                         let elevation = sym.to_digit(10).unwrap() as usize;
-                        current_data
-                            .tile_data
-                            .insert((col, row), Tile::Indestructable(elevation));
+                        current_data.insert(col, row, Tile::Indestructable(elevation));
                     }
                     'x' => {
-                        current_data
-                            .tile_data
-                            .insert((col, row), Tile::Desructable(2));
+                        current_data.insert(col, row, Tile::Desructable(2));
                     }
-                    _ => {}
+                    _ => (),
                 };
             }
         }
