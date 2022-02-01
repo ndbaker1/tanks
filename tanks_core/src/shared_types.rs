@@ -17,7 +17,7 @@ pub enum Tile {
 
 pub type MapLandmarks = HashMap<usize, HashMap<usize, Tile>>;
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+#[derive(Deserialize, Serialize, Debug, Clone, Default)]
 pub struct ServerGameState {
     pub players: HashMap<String, PlayerData>,
     pub map: MapLandmarks,

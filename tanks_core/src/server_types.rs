@@ -21,7 +21,7 @@ pub enum ClientEvent {
     PlayerShoot {
         angle: f64,
     },
-    JoinSession,
+    JoinSession(String),
     CreateSession,
     LeaveSession,
 }

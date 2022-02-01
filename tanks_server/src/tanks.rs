@@ -11,7 +11,9 @@ use tanks_core::{
 };
 use tokio::time::delay_for;
 use websocket_server::{
-    cleanup_session, message_client, sessions::Session, SafeClients, SafeSessions,
+    cleanup_session, message_client,
+    sessions::{Client, Clients, Session, Sessions},
+    SafeClients, SafeSessions,
 };
 
 lazy_static! {
@@ -121,7 +123,10 @@ pub async fn handle_event(
 
     match client_event {
         ClientEvent::PlayerControlUpdate { key, press } => {
-            let session_id = get_client_session_id(&client_id, &clients).await.unwrap();
+            let session_id = {
+                let clients = clients.read().await;
+                get_client_session_id(&client_id, &clients).unwrap()
+            };
             if let Some(session) = sessions.write().await.get_mut(&session_id) {
                 if let Some(player_data) = session.data.players.get_mut(&client_id) {
                     match press {
@@ -132,7 +137,10 @@ pub async fn handle_event(
             }
         }
         ClientEvent::PlayerShoot { angle } => {
-            let session_id = get_client_session_id(&client_id, &clients).await.unwrap();
+            let session_id = {
+                let clients = clients.read().await;
+                get_client_session_id(&client_id, &clients).unwrap()
+            };
 
             if let Some(session) = sessions.write().await.get_mut(&session_id) {
                 if let Some(player) = session.data.players.get_mut(&client_id) {
@@ -158,150 +166,157 @@ pub async fn handle_event(
         }
         ClientEvent::CreateSession => {
             log::info!("request from <{}> to create new session", client_id);
-            create_session(&client_id, None, &sessions, &clients).await;
-        }
-        ClientEvent::JoinSession => {
-            log::info!("request from <{}> to join a session", client_id);
-            // place player in first valid session
-            for session in sessions.write().await.values_mut() {
-                insert_client_into_given_session(&client_id, &clients, session).await;
-                if let Some(client) = clients.read().await.get(&client_id) {
-                    log::warn!("sending map");
-                    message_client(
-                        client,
-                        &ServerEvent::MapUpdate(MAPS.get("first").unwrap().tile_data.clone()),
-                    );
+
+            let session_id = {
+                let mut sessions = sessions.write().await;
+                match create_session(None, &mut sessions) {
+                    Ok(id) => id,
+                    Err(_) => return log::error!("failed to create session.."),
                 }
-                return;
+            };
+
+            if let Some(client) = clients.write().await.get_mut(&client_id) {
+                if let Some(session) = sessions.write().await.get_mut(&session_id) {
+                    insert_client_into_session(client, session);
+                }
+            }
+        }
+        ClientEvent::JoinSession(session_id) => {
+            log::info!(
+                "request from <{}> to join session {}",
+                client_id,
+                session_id
+            );
+
+            // If the Session does not exists then we will create it first
+            if sessions.read().await.get(&session_id).is_none() {
+                let mut mut_sessions = sessions.write().await;
+                if let Err(_) = create_session(Some(&session_id), &mut mut_sessions) {
+                    return log::error!("");
+                };
             }
 
-            create_session(&client_id, None, &sessions, &clients).await;
+            if let Some(client) = clients.write().await.get_mut(&client_id) {
+                if let Some(session) = sessions.write().await.get_mut(&session_id) {
+                    insert_client_into_session(client, session);
+                }
+            }
+
+            log::warn!("sending map data..");
+
+            if let Some(client) = clients.write().await.get_mut(&client_id) {
+                message_client(
+                    client,
+                    &ServerEvent::MapUpdate(MAPS.get("first").unwrap().tile_data.clone()),
+                );
+            }
         }
         ClientEvent::LeaveSession => {
-            remove_client_from_current_session(&client_id, &clients, &sessions).await;
+            let mut sessions = sessions.write().await;
+            if let Some(client) = clients.write().await.get_mut(&client_id) {
+                remove_client_from_current_session(client, &mut sessions);
+            }
         }
     }
 }
 
 /// Creates a Session with a given Client as its creator / first member
-pub async fn create_session(
-    client_id: &str,
+pub fn create_session(
     session_id: Option<&str>,
-    sessions: &SafeSessions<ServerGameState>,
-    clients: &SafeClients,
-) {
+    sessions: &mut Sessions<ServerGameState>,
+) -> Result<String, ()> {
     log::info!("creating session..");
     let session = &mut Session {
         client_statuses: HashMap::new(),
-        owner: String::from(client_id),
+        owner: String::new(),
         id: match session_id {
             Some(id) => String::from(id),
             None => get_rand_session_id(),
         },
-        data: ServerGameState {
-            players: [(String::from(client_id), PlayerData::new(client_id))]
-                .into_iter()
-                .collect(),
-            map: HashMap::new(),
-            bullets: Vec::new(),
-        },
+        data: ServerGameState::default(),
     };
-
-    // insert the host client into the session
-    session.insert_client(&String::from(client_id), true);
 
     log::info!("writing new session {} to global sessions", session.id);
     // add a new session into the server
-    sessions
-        .write()
-        .await
-        .insert(session.id.clone(), session.clone());
-
-    log::info!("attaching session {} to client {}", session.id, client_id);
-    // update the session reference within the client
-    if let Some(client) = clients.write().await.get_mut(client_id) {
-        client.session_id = Some(session.id.clone());
-    }
+    sessions.insert(session.id.clone(), session.clone());
 
     log::info!("finished creating session {}", session.id);
-    log::info!("sessions live: {}", sessions.read().await.len());
+    log::info!("sessions live: {}", sessions.len());
+
+    Ok(session.id.clone())
 }
 
 /// Removes a client from the session that they currently exist under
-async fn remove_client_from_current_session<T>(
-    client_id: &str,
-    clients: &SafeClients,
-    sessions: &SafeSessions<T>,
-) {
+fn remove_client_from_current_session<T>(client: &mut Client, sessions: &mut Sessions<T>) {
     log::info!(
         "attempting to remove client {} from their current session",
-        client_id
+        client.id
     );
 
-    let session_id = match get_client_session_id(client_id, clients).await {
-        Some(session_id) => session_id,
-        None => return log::warn!("client {} was not in a session", client_id),
+    let session_id = match &client.session_id {
+        Some(id) => id.clone(),
+        None => return log::warn!("client {} was not in a session", client.id),
     };
 
-    let session_empty = match sessions.write().await.get_mut(&session_id) {
+    match sessions.get_mut(&session_id) {
         Some(session) => {
             // remove the client from the session
-            session.remove_client(client_id);
+            session.remove_client(&client.id);
 
-            log::info!("removed client {} from session {}", client_id, session_id);
+            log::info!("removed client {} from session {}", client.id, session_id);
 
             // revoke the client's copy of the session_id
-            if let Some(client) = clients.write().await.get_mut(client_id) {
-                client.session_id = None;
+            client.session_id = None;
+
+            // clean up the session from the map if it is empty
+            if session.get_clients_with_active_status(true).is_empty() {
+                cleanup_session(&session_id, sessions);
             }
-
-            session.get_clients_with_active_status(true).is_empty()
         }
-        None => false,
-    };
-
-    // clean up the session from the map if it is empty
-    if session_empty {
-        cleanup_session(&session_id, sessions).await;
+        None => {
+            return log::error!(
+                "failed to find session {} to remove client {}",
+                session_id,
+                client.id
+            )
+        }
     }
 }
 
 /// Takes a mutable session reference in order to add a client to a given session
 ///
-/// Uses a Read lock for Clients
-async fn insert_client_into_given_session(
-    client_id: &str,
-    clients: &SafeClients,
-    session: &mut Session<ServerGameState>,
-) {
+/// Takes a Read lock for Clients
+fn insert_client_into_session(client: &mut Client, session: &mut Session<ServerGameState>) {
     // add client to session
-    session.insert_client(client_id, true);
+    session.insert_client(&client.id, true);
     // add client to gamedata
     session
         .data
         .players
-        .insert(String::from(client_id), PlayerData::new(client_id));
-    // update session_id of client
-    if let Some(client) = clients.write().await.get_mut(client_id) {
-        client.session_id = Some(session.id.clone());
-    }
+        .insert(client.id.clone(), PlayerData::new(&client.id));
 
-    log::info!("client <{}> joined session: <{}>", client_id, session.id);
+    log::info!("attaching session {} to client <{}>", session.id, client.id);
+    // update session_id of client
+    client.session_id = Some(session.id.clone());
+
+    log::info!("client <{}> joined session: <{}>", client.id, session.id);
 }
 
 /// Gets a random new session 1 that is 5 characters long
 /// This should almost ensure session uniqueness when dealing with a sizeable number of sessions
 fn get_rand_session_id() -> String {
-    let alphabet = [
-        'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R',
-        'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z',
-    ];
-    nanoid!(5, &alphabet)
+    nanoid!(
+        5,
+        &[
+            'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q',
+            'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z',
+        ]
+    )
 }
 
 /// pull the session id off of a client
-async fn get_client_session_id(client_id: &str, clients: &SafeClients) -> Option<String> {
-    match clients.read().await.get(client_id) {
+fn get_client_session_id(client_id: &str, clients: &Clients) -> Option<String> {
+    match clients.get(client_id) {
         Some(client) => client.session_id.clone(),
         None => None,
     }

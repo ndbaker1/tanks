@@ -37,8 +37,12 @@ pub fn setup_websocket_listeners<F: Fn(ServerEvent) + 'static>(ws: &WebSocket, e
     let cloned_ws = ws.clone();
     let onopen_callback = Closure::wrap(Box::new(move |_: MessageEvent| {
         if cloned_ws.is_ready() {
+            // TEMP
+            let test_room = String::from("ASDFG");
             cloned_ws
-                .send_with_str(&serde_json::to_string(&ClientEvent::JoinSession).unwrap())
+                .send_with_str(
+                    &serde_json::to_string(&ClientEvent::JoinSession(test_room)).unwrap(),
+                )
                 .unwrap();
         }
     }) as Box<dyn FnMut(_)>);

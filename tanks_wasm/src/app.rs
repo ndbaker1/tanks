@@ -78,7 +78,10 @@ pub fn handle_server_event(event: ServerEvent, game_state: &mut ClientGameState)
                 })
                 .collect()
         }
-        ServerEvent::BulletExplode(pos) => {}
+        ServerEvent::BulletExplode(_) => {
+            // display some kind of animation to show that
+            // the bullets exploded at these coordinates
+        }
         ServerEvent::MapUpdate(tile_updates) => {
             for (col, columns) in tile_updates {
                 for (row, tile) in columns {
