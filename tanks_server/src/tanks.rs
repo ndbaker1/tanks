@@ -124,8 +124,8 @@ pub async fn handle_event(
     match client_event {
         ClientEvent::PlayerControlUpdate { key, press } => {
             let session_id = {
-                let clients = clients.read().await;
-                pull_client_session_id(&client_id, &clients).unwrap()
+                let clients = &clients.read().await;
+                pull_client_session_id(&client_id, clients).unwrap()
             };
 
             if let Some(session) = sessions.write().await.get_mut(&session_id) {
@@ -139,8 +139,8 @@ pub async fn handle_event(
         }
         ClientEvent::PlayerShoot { angle } => {
             let session_id = {
-                let clients = clients.read().await;
-                pull_client_session_id(&client_id, &clients).unwrap()
+                let clients = &clients.read().await;
+                pull_client_session_id(&client_id, clients).unwrap()
             };
 
             if let Some(session) = sessions.write().await.get_mut(&session_id) {
@@ -169,8 +169,8 @@ pub async fn handle_event(
             log::info!("request from <{}> to create new session", client_id);
 
             let session_id = {
-                let mut sessions = sessions.write().await;
-                match create_session(None, &mut sessions) {
+                let sessions = &mut sessions.write().await;
+                match create_session(None, sessions) {
                     Ok(id) => id,
                     Err(_) => return log::error!("failed to create session.."),
                 }
@@ -191,8 +191,8 @@ pub async fn handle_event(
 
             // If the Session does not exists then we will create it first
             if sessions.read().await.get(&session_id).is_none() {
-                let mut mut_sessions = sessions.write().await;
-                create_session(Some(&session_id), &mut mut_sessions)
+                let mut_sessions = &mut sessions.write().await;
+                create_session(Some(&session_id), mut_sessions)
                     .expect("unable to create a session with a given id.");
             }
 
@@ -212,8 +212,8 @@ pub async fn handle_event(
         }
         ClientEvent::LeaveSession => {
             if let Some(client) = clients.write().await.get_mut(&client_id) {
-                let mut sessions = sessions.write().await;
-                remove_client_from_current_session(client, &mut sessions);
+                let sessions = &mut sessions.write().await;
+                remove_client_from_current_session(client, sessions);
             }
         }
     }
