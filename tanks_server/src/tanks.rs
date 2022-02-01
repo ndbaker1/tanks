@@ -255,7 +255,7 @@ fn remove_client_from_current_session<T>(client: &mut Client, sessions: &mut Ses
     );
 
     let session_id = match &client.session_id {
-        Some(id) => id.clone(),
+        Some(id) => String::from(id),
         None => return log::warn!("client {} was not in a session", client.id),
     };
 
@@ -265,22 +265,18 @@ fn remove_client_from_current_session<T>(client: &mut Client, sessions: &mut Ses
             session.remove_client(&client.id);
 
             log::info!("removed client {} from session {}", client.id, session_id);
-
-            // revoke the client's copy of the session_id
+            // revoke the client's reference to the current Session ID
             client.session_id = None;
-
             // clean up the session from the map if it is empty
             if session.get_clients_with_active_status(true).is_empty() {
                 cleanup_session(&session_id, sessions);
             }
         }
-        None => {
-            return log::error!(
-                "failed to find session {} to remove client {}",
-                session_id,
-                client.id
-            )
-        }
+        None => log::error!(
+            "failed to find session {} to remove client {}",
+            session_id,
+            client.id
+        ),
     }
 }
 
