@@ -7,7 +7,7 @@ use tanks_core::{
     map::{parse_maps, MapData},
     server_types::{ClientEvent, ServerEvent},
     shared_types::{Bullet, PlayerData, PlayerState, ServerGameState, Tickable, Vec2d},
-    BULLET_SPEED, MAP_HEIGHT, MAP_WIDTH,
+    BULLET_SPEED,
 };
 use tokio::time::delay_for;
 use websocket_server::{
@@ -37,12 +37,7 @@ pub async fn tick_handler(clients: SafeClients, sessions: SafeSessions<ServerGam
             // Check Bullet Wall Collisions
             game_data
                 .bullets
-                .drain_remove_if(|bullet| {
-                    bullet.pos.x < 0.0
-                        || bullet.pos.x > MAP_WIDTH as f64
-                        || bullet.pos.y < 0.0
-                        || bullet.pos.y > MAP_HEIGHT as f64
-                })
+                .drain_remove_if(|bullet| bullet.collide_bounds())
                 .into_iter()
                 .for_each(|bullet| {
                     if let Some(player) = game_data.players.get_mut(&bullet.player_id) {
@@ -150,8 +145,9 @@ pub async fn handle_event(
                             player.bullets_left -= 1;
 
                             session.data.bullets.push(Bullet {
-                                player_id: client_id.clone(),
                                 angle,
+                                bounces: 1,
+                                player_id: client_id.clone(),
                                 pos: player.position.clone(),
                                 velocity: Vec2d {
                                     x: BULLET_SPEED * angle.cos(),

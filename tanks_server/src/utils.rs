@@ -2,16 +2,16 @@ use std::collections::HashSet;
 
 use tanks_core::shared_types::Bullet;
 
-pub trait VecOps<T, F: Fn(&T) -> bool> {
+pub trait VecOps<T, F: Fn(&mut T) -> bool> {
     fn drain_remove_if(&mut self, predicate: F) -> Vec<T>;
 }
 
-impl<T, F: Fn(&T) -> bool> VecOps<T, F> for Vec<T> {
+impl<T, F: Fn(&mut T) -> bool> VecOps<T, F> for Vec<T> {
     fn drain_remove_if(&mut self, predicate: F) -> Vec<T> {
         let mut return_vec = Vec::new();
         let mut i = 0;
         while i < self.len() {
-            if predicate(&self[i]) {
+            if predicate(&mut self[i]) {
                 return_vec.push(self.remove(i));
             } else {
                 i += 1;

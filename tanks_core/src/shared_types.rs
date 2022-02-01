@@ -1,6 +1,9 @@
-use crate::{BULLET_COUNT, BULLET_SIZE, PLAYER_SPEED};
+use crate::{BULLET_COUNT, BULLET_SIZE, BULLET_SPEED, MAP_HEIGHT, MAP_WIDTH, PLAYER_SPEED};
 use serde::{Deserialize, Serialize};
-use std::collections::{HashMap, HashSet};
+use std::{
+    collections::{HashMap, HashSet},
+    f64::consts::PI,
+};
 
 /// Trait for an Object that can update on the server Tick
 pub trait Tickable {
@@ -41,6 +44,8 @@ pub struct Bullet {
     pub velocity: Vec2d,
     /// Angle of the Bullet
     pub angle: f64,
+    /// The number of wall bounces untill the Bullet explodes
+    pub bounces: u8,
 }
 
 impl Bullet {
@@ -51,6 +56,35 @@ impl Bullet {
         };
 
         delta.x * delta.x + delta.y * delta.y < BULLET_SIZE * BULLET_SIZE
+    }
+
+    pub fn collide_bounds(&mut self) -> bool {
+        let collides_x = self.pos.x > MAP_WIDTH as f64 || self.pos.x < 0.0;
+        let collides_y = self.pos.y > MAP_HEIGHT as f64 || self.pos.y < 0.0;
+
+        if collides_x || collides_y {
+            if collides_x {
+                self.velocity.x *= -(collides_x as i8) as f64;
+            }
+            if collides_y {
+                self.velocity.y *= -(collides_y as i8) as f64;
+            }
+
+            let has_bounces = self.bounces > 0;
+            if has_bounces {
+                self.bounces -= 1;
+            }
+
+            !has_bounces
+        } else {
+            false
+        }
+    }
+
+    pub fn add_angle(&mut self, turn: f64) {
+        self.angle = (self.angle + turn) % (2.0 * PI);
+        self.velocity.x = BULLET_SPEED * self.angle.cos();
+        self.velocity.y = BULLET_SPEED * self.angle.sin();
     }
 }
 
