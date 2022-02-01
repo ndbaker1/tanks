@@ -125,8 +125,9 @@ pub async fn handle_event(
         ClientEvent::PlayerControlUpdate { key, press } => {
             let session_id = {
                 let clients = clients.read().await;
-                get_client_session_id(&client_id, &clients).unwrap()
+                pull_client_session_id(&client_id, &clients).unwrap()
             };
+
             if let Some(session) = sessions.write().await.get_mut(&session_id) {
                 if let Some(player_data) = session.data.players.get_mut(&client_id) {
                     match press {
@@ -139,7 +140,7 @@ pub async fn handle_event(
         ClientEvent::PlayerShoot { angle } => {
             let session_id = {
                 let clients = clients.read().await;
-                get_client_session_id(&client_id, &clients).unwrap()
+                pull_client_session_id(&client_id, &clients).unwrap()
             };
 
             if let Some(session) = sessions.write().await.get_mut(&session_id) {
@@ -191,9 +192,8 @@ pub async fn handle_event(
             // If the Session does not exists then we will create it first
             if sessions.read().await.get(&session_id).is_none() {
                 let mut mut_sessions = sessions.write().await;
-                if let Err(_) = create_session(Some(&session_id), &mut mut_sessions) {
-                    return log::error!("");
-                };
+                create_session(Some(&session_id), &mut mut_sessions)
+                    .expect("unable to create a session with a given id.");
             }
 
             if let Some(client) = clients.write().await.get_mut(&client_id) {
@@ -202,9 +202,8 @@ pub async fn handle_event(
                 }
             }
 
-            log::warn!("sending map data..");
-
             if let Some(client) = clients.write().await.get_mut(&client_id) {
+                log::warn!("sending map data..");
                 message_client(
                     client,
                     &ServerEvent::MapUpdate(MAPS.get("first").unwrap().tile_data.clone()),
@@ -212,15 +211,17 @@ pub async fn handle_event(
             }
         }
         ClientEvent::LeaveSession => {
-            let mut sessions = sessions.write().await;
             if let Some(client) = clients.write().await.get_mut(&client_id) {
+                let mut sessions = sessions.write().await;
                 remove_client_from_current_session(client, &mut sessions);
             }
         }
     }
 }
 
-/// Creates a Session with a given Client as its creator / first member
+/// Creates a new empty Session
+///
+/// Takes a predefined ID to generate, or uses a randomly generated String
 pub fn create_session(
     session_id: Option<&str>,
     sessions: &mut Sessions<ServerGameState>,
@@ -231,7 +232,7 @@ pub fn create_session(
         owner: String::new(),
         id: match session_id {
             Some(id) => String::from(id),
-            None => get_rand_session_id(),
+            None => generate_session_id(SESSION_ID_LENGTH),
         },
         data: ServerGameState::default(),
     };
@@ -302,11 +303,16 @@ fn insert_client_into_session(client: &mut Client, session: &mut Session<ServerG
     log::info!("client <{}> joined session: <{}>", client.id, session.id);
 }
 
-/// Gets a random new session 1 that is 5 characters long
-/// This should almost ensure session uniqueness when dealing with a sizeable number of sessions
-fn get_rand_session_id() -> String {
+/// The Chosen Length of a Session ID
+pub const SESSION_ID_LENGTH: usize = 5;
+
+/// Generates a String of given length using characters that are valid for Session IDs
+///
+/// This should effectively resolve to Session uniqueness when the length is
+/// greater than a value like 4 for a plausable number of concurrent sessions
+fn generate_session_id(length: usize) -> String {
     nanoid!(
-        5,
+        length,
         &[
             'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q',
             'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z',
@@ -315,7 +321,7 @@ fn get_rand_session_id() -> String {
 }
 
 /// pull the session id off of a client
-fn get_client_session_id(client_id: &str, clients: &Clients) -> Option<String> {
+fn pull_client_session_id(client_id: &str, clients: &Clients) -> Option<String> {
     match clients.get(client_id) {
         Some(client) => client.session_id.clone(),
         None => None,
