@@ -6,6 +6,4 @@ members = [
   "tanks_core",
   "tanks_server",
   "tanks_wasm",
-
-  "pack-wasm",
 ]

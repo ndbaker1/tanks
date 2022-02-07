@@ -34,6 +34,7 @@ impl ServerGameState {
     }
 }
 
+/// Projectile shot from a Tank that will bounce off walls and destroy other Tanks (Players)
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct Bullet {
     /// The ID of the player who created the bullet
@@ -98,11 +99,12 @@ impl Tickable for Bullet {
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub enum PlayerState {
-    /// Move Delay involved with shooting a bullet
+    /// Player movement delay after shooting a bullet
     Shooting(u32),
     Idle,
 }
 
+/// Data the Server has to track for a Player Tank
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct PlayerData {
     pub id: String,
@@ -161,9 +163,8 @@ impl PlayerData {
                 _ => {}
             };
         }
-        delta.normalize().scale(PLAYER_SPEED);
 
-        self.position.add(&delta);
+        self.position.add(delta.normalize().scale(PLAYER_SPEED));
     }
 }
 

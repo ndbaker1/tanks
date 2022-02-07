@@ -13,7 +13,7 @@ RUN cargo install -f wasm-bindgen-cli
 # install WASM target
 RUN rustup target add wasm32-unknown-unknown
 COPY . .
-RUN cargo run -p pack-wasm
+RUN cargo run --bin pack-wasm
 
 FROM scratch as deployment
 COPY assets .

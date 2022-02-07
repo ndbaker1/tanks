@@ -20,6 +20,7 @@ I wrote [this websocket server](https://github.com/ndbaker1/websocket-server) wr
 
 `pack-wasm` lib is my hacky way of creating a custom build script for packing wasm and including an index page file which I find slightly annoying using `wasm-pack` because you cant specify the `.wasm` target like with `wasm-bindgen-cli`
 ```sh
+cargo install wasm-bindgen-cli
 cargo run --bin pack-wasm
 ```
 
