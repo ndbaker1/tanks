@@ -6,7 +6,7 @@
 
 ## Background
 
-So I wanted to make a game completely in Rust but could only find small bits of documentation in different articles/posts.
+So I wanted to make a web game completely in Rust but could only find small bits of documentation in different articles/posts.
 
 Therefore, I decided to make this as a general example for myself (and practice my Rust) regarding how to implement several critical Rust WASM features, such as implementing WebSockets and drawing to a browser Canvas exclusively from Rust APIs.
 
