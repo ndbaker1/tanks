@@ -33,7 +33,7 @@ pub fn process_collisions(vec: &Vec<Bullet>) -> Vec<usize> {
         }
     }
     let mut vec = set.into_iter().collect::<Vec<usize>>();
-    vec.sort();
+    vec.sort_unstable();
     vec.reverse();
 
     vec

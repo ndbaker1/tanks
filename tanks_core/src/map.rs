@@ -31,10 +31,10 @@ pub struct MapData {
 
 impl MapData {
     pub fn insert(&mut self, col: usize, row: usize, val: Tile) {
-        if !self.tile_data.contains_key(&col) {
-            self.tile_data.insert(col, HashMap::new());
-        }
-        self.tile_data.get_mut(&col).unwrap().insert(row, val);
+        self.tile_data
+            .entry(col)
+            .or_insert_with(HashMap::new)
+            .insert(row, val);
     }
 }
 
