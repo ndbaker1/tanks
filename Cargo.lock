@@ -1425,7 +1425,7 @@ dependencies = [
 [[package]]
 name = "websocket-server"
 version = "0.1.0"
-source = "git+https://github.com/ndbaker1/websocket-server?rev=7d6193d#7d6193ddac644cf01fa0bdf2cdfb678aa561bff9"
+source = "git+https://github.com/ndbaker1/websocket-server?rev=aced2d7#aced2d7853f60d44977e7184d1979dc84bbbe71e"
 dependencies = [
  "futures",
  "log",

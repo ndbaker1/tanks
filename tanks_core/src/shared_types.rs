@@ -67,6 +67,7 @@ impl Bullet {
             if collides_x {
                 self.velocity.x *= -(collides_x as i8) as f64;
             }
+
             if collides_y {
                 self.velocity.y *= -(collides_y as i8) as f64;
             }
