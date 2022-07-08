@@ -41,7 +41,7 @@ fn main() {
     validate_command_result(&mut command);
 
     println!(
-        "\n⚡ Finished packaging browser resources into '{}' directory\n",
+        "\n⚡ Finished packaging browser resources into './{}' directory\n",
         output_dir
     );
 
@@ -56,14 +56,14 @@ fn validate_command_result(command: &mut Command) {
     println!("EXECUTING :: ( {:?} )", command);
     let output = command.output().expect("failed to execute");
 
-    if !output.status.success() {
+    if output.status.success() {
+        println!("SUCCESS ✔");
+    } else {
         println!("FAILURE ✖");
         println!("---------------- FAILURE OUTPUT ----------------");
         write_all_feedback(&output);
         println!("------------------------------------------------");
         exit(1);
-    } else {
-        println!("SUCCESS ✔");
     }
 }
 

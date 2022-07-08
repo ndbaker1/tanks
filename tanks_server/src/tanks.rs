@@ -23,6 +23,7 @@ lazy_static! {
 
 /// The handler for game logic on the server
 ///
+/// ### Warnings
 /// This will take a lot of bandwidth if the rate is too high
 pub async fn tick_handler(clients: SafeClients, sessions: SafeSessions<ServerGameState>) {
     loop {

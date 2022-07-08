@@ -51,17 +51,14 @@ pub fn parse_maps(filepath: &str) -> HashMap<String, MapData> {
     let mut current_data = MapData::default();
     for (row, line) in file_lines.enumerate() {
         if line.starts_with(MAP_DELIMITER) {
-            match reading {
-                true => {
-                    maps.insert(current_data.name.clone(), current_data.clone());
+            if reading {
+                maps.insert(current_data.name.clone(), current_data.clone());
+            } else {
+                current_data = MapData {
+                    name: String::from(&line[1..]),
+                    tile_data: HashMap::new(),
                 }
-                false => {
-                    current_data = MapData {
-                        name: String::from(&line[1..]),
-                        tile_data: HashMap::new(),
-                    }
-                }
-            };
+            }
 
             reading = !reading;
         } else {
