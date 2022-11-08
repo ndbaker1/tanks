@@ -1,8 +1,23 @@
-use std::env;
-use websocket_server::{server, ServerConfig};
+use std::{env, net::SocketAddr, sync::Arc};
 
-pub mod tanks;
-pub mod utils;
+use axum::{response::IntoResponse, routing::get, Extension, Router};
+use tanks_core::common::gamestate::GameState;
+use tokio::{sync::Mutex, task::JoinHandle};
+use tracing::{info, Level};
+
+use crate::state::SharedServerState;
+
+mod state;
+mod tanks;
+mod ws;
+
+#[derive(Default)]
+pub struct SessionContainer {
+    task_handle: Option<JoinHandle<()>>,
+    gamestate: Arc<Mutex<GameState>>,
+}
+
+type SessionData = SessionContainer;
 
 #[tokio::main]
 async fn main() {
@@ -11,16 +26,30 @@ async fn main() {
         .parse()
         .expect("PORT must be a number");
 
-    // initialize env_logging backend for logging
-    env_logger::init();
+    let state = SharedServerState::<SessionData>::default();
 
-    // Pass handlers for the server into the ServerConfig to get them initialized with the application
-    let server_config = ServerConfig {
-        tick_handler: Some(tanks::tick_handler),
-        event_handler: tanks::handle_event,
-    };
+    let app = Router::new()
+        .route("/health", get(health_handler))
+        .route("/ws", get(ws::websocket_handler))
+        .layer(Extension(state));
 
-    warp::serve(server(server_config))
-        .run(([0, 0, 0, 0], port))
-        .await;
+    let addr = SocketAddr::from(([0, 0, 0, 0], port));
+
+    let subscriber = tracing_subscriber::FmtSubscriber::builder()
+        .with_max_level(Level::TRACE)
+        .finish();
+
+    tracing::subscriber::set_global_default(subscriber).expect("setting default subscriber failed");
+    tracing::debug!("listening on {}", addr);
+
+    axum::Server::bind(&addr)
+        .serve(app.into_make_service())
+        .await
+        .unwrap();
+}
+
+/// Health Check Endpoint used to verify the service is live
+async fn health_handler() -> impl IntoResponse {
+    info!("HEALTH_CHECK ✓");
+    "health check ✓".into_response()
 }

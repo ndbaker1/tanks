@@ -1,5 +1,5 @@
 use std::{cell::RefCell, rc::Rc};
-use tanks_core::{shared_types::Vec2d, MAP_HEIGHT, MAP_WIDTH};
+use tanks_core::{common::Vec2d, MAP_BLOCK_HEIGHT, MAP_BLOCK_WIDTH};
 use wasm_bindgen::{prelude::*, JsCast};
 use web_sys::{CanvasRenderingContext2d, HtmlCanvasElement, WebSocket};
 
@@ -148,5 +148,5 @@ impl Prepared for WebSocket {
 /// Get the Square Unit size based on the current screen dimensions
 pub fn get_block_size() -> f64 {
     let bounds = get_window_bounds();
-    (bounds.x / MAP_WIDTH as f64).min(bounds.y / MAP_HEIGHT as f64)
+    (bounds.x / MAP_BLOCK_WIDTH as f64).min(bounds.y / MAP_BLOCK_HEIGHT as f64)
 }
