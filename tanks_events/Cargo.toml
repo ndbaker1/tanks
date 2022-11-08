@@ -1,0 +1,12 @@
+[package]
+name = "tanks_events"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+tanks_core = { path = "../tanks_core" }
+
+serde = "1.0.147"
+

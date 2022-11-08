@@ -5,8 +5,7 @@ use crate::{
 };
 use std::{collections::HashMap, f64::consts::PI};
 use tanks_core::{
-    map::MapData, server_types::ServerEvent, shared_types::Vec2d, BULLET_SIZE, MAP_HEIGHT,
-    MAP_WIDTH,
+    map::MapData, server_types::ServerEvent, BULLET_SIZE, MAP_BLOCK_HEIGHT, MAP_BLOCK_WIDTH,
 };
 use web_sys::{CanvasRenderingContext2d, HtmlCanvasElement};
 
@@ -57,7 +56,7 @@ impl ClientGameState {
 
 pub fn handle_server_event(event: ServerEvent, game_state: &mut ClientGameState) {
     match event {
-        ServerEvent::PlayerPosUpdate { mut coord, player } => {
+        ServerEvent::ClientPosUpdate { mut coord, player } => {
             coord.scale(get_block_size());
             // either update the player or add them
             if let Some(player_data) = game_state.player_data.get_mut(&player) {
@@ -115,8 +114,8 @@ fn render_game(context: &CanvasRenderingContext2d, game_state: &ClientGameState)
     let block_size = get_block_size();
 
     let colors = ["#5C6784", "#1D263B"];
-    for col in 0..MAP_WIDTH {
-        for row in 0..MAP_HEIGHT {
+    for col in 0..MAP_BLOCK_WIDTH {
+        for row in 0..MAP_BLOCK_HEIGHT {
             context.set_fill_style(&colors[(col + row).rem_euclid(2)].into());
 
             if let Some(column) = game_state.map_landmarks.tile_data.get(&col) {
@@ -158,7 +157,13 @@ fn render_game(context: &CanvasRenderingContext2d, game_state: &ClientGameState)
         context.set_fill_style(&"grey".into());
         context.begin_path();
         context
-            .arc(bullet.x, bullet.y, block_size * BULLET_SIZE, 0.0, 2.0 * PI)
+            .arc(
+                bullet.x,
+                bullet.y,
+                block_size * BULLET_SIZE / 2,
+                0.0,
+                2.0 * PI,
+            )
             .expect("bullet could not be drawn");
         context.fill();
     }
@@ -170,4 +175,40 @@ fn render_game(context: &CanvasRenderingContext2d, game_state: &ClientGameState)
     context.stroke();
 
     context.restore();
+}
+
+impl From<&Direction> for Vector2 {
+    fn from(dir: &Direction) -> Self {
+        match dir {
+            Direction::North => Vector2 { x: 0.0, y: -1.0 },
+            Direction::NorthEast => Vector2 {
+                x: 0.707,
+                y: -0.707,
+            },
+            Direction::East => Vector2 { x: 1.0, y: 0.0 },
+            Direction::SouthEast => Vector2 { x: 0.707, y: 0.707 },
+            Direction::South => Vector2 { x: 0.0, y: 1.0 },
+            Direction::SouthWest => Vector2 {
+                x: -0.707,
+                y: 0.707,
+            },
+            Direction::West => Vector2 { x: -1.0, y: 0.0 },
+            Direction::NorthWest => Vector2 {
+                x: -0.707,
+                y: -0.707,
+            },
+        }
+    }
+}
+
+#[derive(Deserialize, Serialize, Debug, Clone, Hash, PartialEq, Eq)]
+pub enum Direction {
+    North,
+    NorthEast,
+    East,
+    SouthEast,
+    South,
+    SouthWest,
+    West,
+    NorthWest,
 }

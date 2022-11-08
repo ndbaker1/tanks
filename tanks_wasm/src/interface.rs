@@ -6,7 +6,7 @@ use crate::{
     utils::{fetch_or_create_canvas, js_window, Canvas, Prepared},
 };
 use std::{cell::RefCell, rc::Rc};
-use tanks_core::{server_types::ClientEvent, shared_types::Vec2d};
+use tanks_core::{common::Vec2d, server_types::ClientEvent};
 use wasm_bindgen::{prelude::*, JsCast};
 use web_sys::{Event, HtmlCanvasElement, KeyboardEvent, MouseEvent, WebSocket};
 
@@ -72,7 +72,7 @@ pub fn setup_window_listeners() {
         CONNECTION_STATE.with(|state| {
             if let Some(ws) = &state.borrow_mut().ws {
                 if ws.is_ready() {
-                    let tank_shoot = ClientEvent::PlayerShoot {
+                    let tank_shoot = ClientEvent::Shoot {
                         angle: GAME_STATE.with(|state| state.borrow().get_mouse_angle()),
                     };
 
@@ -94,7 +94,7 @@ pub fn setup_window_listeners() {
             match &connection_state.ws {
                 Some(ws) => {
                     if ws.is_ready() {
-                        let keypressed_event = ClientEvent::PlayerControlUpdate {
+                        let keypressed_event = ClientEvent::ClientControlUpdate {
                             press: true,
                             key: event.key().to_uppercase(),
                         };
@@ -124,7 +124,7 @@ pub fn setup_window_listeners() {
 
     // Key Releasing Callback
     let keyup_callback = Closure::wrap(Box::new(move |event: KeyboardEvent| {
-        let keyreleased_event = ClientEvent::PlayerControlUpdate {
+        let keyreleased_event = ClientEvent::ClientControlUpdate {
             press: false,
             key: event.key().to_uppercase(),
         };
