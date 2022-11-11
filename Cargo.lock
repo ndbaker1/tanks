@@ -895,6 +895,7 @@ dependencies = [
  "serde",
  "serde_json",
  "tanks_core",
+ "tanks_events",
  "wasm-bindgen",
  "web-sys",
  "wee_alloc",

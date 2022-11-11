@@ -6,7 +6,7 @@ use super::{
     bullet::Bullet,
     constants::{BULLET_RADIUS, BULLET_SPEED, MAP_BLOCK_HEIGHT, MAP_BLOCK_WIDTH, PLAYER_RADIUS},
     environment::{Environment, Tile},
-    player::{Player, PlayerState},
+    player::{Player, TankState},
 };
 
 #[derive(Debug, Default)]
@@ -38,7 +38,7 @@ impl GameState {
             todo!() // trying to move a player thats not in the game?
         };
 
-        if matches!(player.state, PlayerState::Idle) && player.bullets_remaining > 0 {
+        if matches!(player.state, TankState::Idle) && player.bullets_remaining > 0 {
             // decrement available bullets
             player.bullets_remaining -= 1;
 
@@ -55,7 +55,7 @@ impl GameState {
                 player_id: player.id.clone(),
             });
 
-            player.state = PlayerState::Shooting(5);
+            player.state = TankState::Shooting(5);
         }
     }
 }
@@ -129,9 +129,16 @@ impl GameState {
         for player in self.players.iter_mut().map(|(_, p)| p) {
             for (loc, tile) in &self.environment.tiles {
                 if let Tile::DesructableWall((0, _)) = tile {
-                    if let Err(Vector2 { x, y }) =
-                        circle_rect_collision(&player.position, PLAYER_RADIUS, loc, 1.0, 1.0)
-                    {
+                    if let Err(Vector2 { x, y }) = circle_rect_collision(
+                        &player.position,
+                        PLAYER_RADIUS,
+                        &Vector2 {
+                            x: loc.0 as _,
+                            y: loc.1 as _,
+                        },
+                        1.0,
+                        1.0,
+                    ) {
                         // push the tanks out of the collision box
                         player.position = player.position.plus(&Vector2 {
                             x: PLAYER_RADIUS - x,
@@ -201,9 +208,16 @@ impl GameState {
         for (i, bullet) in &mut self.bullets.iter_mut().enumerate() {
             for (loc, tile) in &self.environment.tiles {
                 if let Tile::DesructableWall((0, _)) = tile {
-                    if let Err(collision) =
-                        circle_rect_collision(&bullet.position, PLAYER_RADIUS, loc, 1.0, 1.0)
-                    {
+                    if let Err(collision) = circle_rect_collision(
+                        &bullet.position,
+                        PLAYER_RADIUS,
+                        &Vector2 {
+                            x: loc.0 as _,
+                            y: loc.1 as _,
+                        },
+                        1.0,
+                        1.0,
+                    ) {
                         if bullet.ricochets > 0 {
                             bullet.ricochets -= 1;
                             // this is faster due to the assumption that all walls are either horizontal or vertically aligned

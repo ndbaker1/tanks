@@ -10,6 +10,7 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 tanks_core = { path = "../tanks_core" }
+tanks_events = { path = "../tanks_events" }
 
 regex = "1"
 js-sys = "0.3.55"

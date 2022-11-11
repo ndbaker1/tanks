@@ -5,8 +5,13 @@ use crate::{
 };
 use std::{collections::HashMap, f64::consts::PI};
 use tanks_core::{
-    map::MapData, server_types::ServerEvent, BULLET_SIZE, MAP_BLOCK_HEIGHT, MAP_BLOCK_WIDTH,
+    common::{
+        constants::{BULLET_RADIUS, MAP_BLOCK_HEIGHT, MAP_BLOCK_WIDTH},
+        environment::{Environment, Tile},
+    },
+    utils::Vector2,
 };
+use tanks_events::ServerEvent;
 use web_sys::{CanvasRenderingContext2d, HtmlCanvasElement};
 
 pub struct ClientPlayerData {}
@@ -14,20 +19,20 @@ pub struct ClientPlayerData {}
 pub struct ClientGameState {
     pub id: String,
     /// Mouse Position relative to bounds of the window
-    pub mouse_pos: Vec2d,
-    pub player_data: HashMap<String, Vec2d>,
-    pub projectile_data: Vec<Vec2d>,
-    pub map_landmarks: MapData,
+    pub mouse_pos: Vector2,
+    pub player_data: HashMap<String, Vector2>,
+    pub projectile_data: Vec<Vector2>,
+    pub map_landmarks: Environment,
 }
 
 impl ClientGameState {
     pub fn new(id: &str) -> Self {
         Self {
             id: String::from(id),
-            mouse_pos: Vec2d::zero(),
-            player_data: [(String::from(id), Vec2d::zero())].into_iter().collect(),
+            mouse_pos: Vector2::zero(),
+            player_data: [(String::from(id), Vector2::zero())].into_iter().collect(),
             projectile_data: Vec::new(),
-            map_landmarks: MapData::default(),
+            map_landmarks: Environment::default(),
         }
     }
 
@@ -40,7 +45,7 @@ impl ClientGameState {
     }
 
     /// Get the Player Data corresponding to the current player using the saved id
-    pub fn get_own_player_data(&self) -> &Vec2d {
+    pub fn get_own_player_data(&self) -> &Vector2 {
         self.player_data
             .get(&self.id)
             .expect("player did not have their own data")
@@ -49,44 +54,34 @@ impl ClientGameState {
     /// The Camera Position for the Player
     ///
     /// This is the Top-Left coordinate
-    pub fn get_camera_pos(&self) -> Vec2d {
-        Vec2d::zero()
+    pub fn get_camera_pos(&self) -> Vector2 {
+        Vector2::zero()
     }
 }
 
 pub fn handle_server_event(event: ServerEvent, game_state: &mut ClientGameState) {
     match event {
-        ServerEvent::ClientPosUpdate { mut coord, player } => {
-            coord.scale(get_block_size());
+        ServerEvent::GameState { bullets, tanks } => {
             // either update the player or add them
-            if let Some(player_data) = game_state.player_data.get_mut(&player) {
-                *player_data = coord;
-            } else {
-                game_state.player_data.insert(player, coord);
+            for tank in tanks {
+                if let Some(player_data) = game_state.player_data.get_mut(&tank.id) {
+                    *player_data = tank.position.scale(get_block_size());
+                } else {
+                    game_state.player_data.insert(tank.id, tank.position);
+                }
             }
+
+            game_state.projectile_data = bullets
+                .into_iter()
+                .map(|pos| pos.position.scale(get_block_size()))
+                .collect()
         }
         ServerEvent::PlayerDisconnect { player } => {
             game_state.player_data.remove(&player);
         }
-        ServerEvent::BulletData(bullets) => {
-            game_state.projectile_data = bullets
-                .into_iter()
-                .map(|(mut pos, _)| {
-                    pos.scale(get_block_size());
-                    pos
-                })
-                .collect()
-        }
         ServerEvent::BulletExplode(_) => {
             // display some kind of animation to show that
             // the bullets exploded at these coordinates
-        }
-        ServerEvent::MapUpdate(tile_updates) => {
-            for (col, columns) in tile_updates {
-                for (row, tile) in columns {
-                    game_state.map_landmarks.insert(col, row, tile);
-                }
-            }
         }
     }
 }
@@ -100,10 +95,11 @@ pub fn render(element: &HtmlCanvasElement, context: &CanvasRenderingContext2d) {
         None => false,
     });
 
-    match connected {
-        true => GAME_STATE.with(|state| render_game(context, &state.borrow())),
-        false => render_login(context),
-    };
+    if connected {
+        GAME_STATE.with(|state| render_game(context, &state.borrow()))
+    } else {
+        render_login(context)
+    }
 }
 
 fn render_game(context: &CanvasRenderingContext2d, game_state: &ClientGameState) {
@@ -118,11 +114,12 @@ fn render_game(context: &CanvasRenderingContext2d, game_state: &ClientGameState)
         for row in 0..MAP_BLOCK_HEIGHT {
             context.set_fill_style(&colors[(col + row).rem_euclid(2)].into());
 
-            if let Some(column) = game_state.map_landmarks.tile_data.get(&col) {
-                match column.get(&row) {
-                    Some(_) => context.set_fill_style(&"purple".into()),
-                    None => (),
-                };
+            if let Some(tile) = game_state.map_landmarks.tiles.get(&(row, col)) {
+                match tile {
+                    Tile::Empty => context.set_fill_style(&"grey".into()),
+                    Tile::DesructableWall(_) => context.set_fill_style(&"orange".into()),
+                    Tile::IndestructableWall(_) => context.set_fill_style(&"brown".into()),
+                }
             }
 
             context.fill_rect(
@@ -160,7 +157,7 @@ fn render_game(context: &CanvasRenderingContext2d, game_state: &ClientGameState)
             .arc(
                 bullet.x,
                 bullet.y,
-                block_size * BULLET_SIZE / 2,
+                block_size * BULLET_RADIUS,
                 0.0,
                 2.0 * PI,
             )
@@ -175,40 +172,4 @@ fn render_game(context: &CanvasRenderingContext2d, game_state: &ClientGameState)
     context.stroke();
 
     context.restore();
-}
-
-impl From<&Direction> for Vector2 {
-    fn from(dir: &Direction) -> Self {
-        match dir {
-            Direction::North => Vector2 { x: 0.0, y: -1.0 },
-            Direction::NorthEast => Vector2 {
-                x: 0.707,
-                y: -0.707,
-            },
-            Direction::East => Vector2 { x: 1.0, y: 0.0 },
-            Direction::SouthEast => Vector2 { x: 0.707, y: 0.707 },
-            Direction::South => Vector2 { x: 0.0, y: 1.0 },
-            Direction::SouthWest => Vector2 {
-                x: -0.707,
-                y: 0.707,
-            },
-            Direction::West => Vector2 { x: -1.0, y: 0.0 },
-            Direction::NorthWest => Vector2 {
-                x: -0.707,
-                y: -0.707,
-            },
-        }
-    }
-}
-
-#[derive(Deserialize, Serialize, Debug, Clone, Hash, PartialEq, Eq)]
-pub enum Direction {
-    North,
-    NorthEast,
-    East,
-    SouthEast,
-    South,
-    SouthWest,
-    West,
-    NorthWest,
 }

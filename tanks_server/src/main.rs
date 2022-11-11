@@ -13,7 +13,7 @@ mod ws;
 
 #[derive(Default)]
 pub struct SessionContainer {
-    task_handle: Option<JoinHandle<()>>,
+    task_handles: Vec<JoinHandle<()>>,
     gamestate: Arc<Mutex<GameState>>,
 }
 
@@ -29,8 +29,8 @@ async fn main() {
     let state = SharedServerState::<SessionData>::default();
 
     let app = Router::new()
-        .route("/health", get(health_handler))
-        .route("/ws", get(ws::websocket_handler))
+        .route("/api/health", get(health_handler))
+        .route("/api/ws", get(ws::websocket_handler))
         .layer(Extension(state));
 
     let addr = SocketAddr::from(([0, 0, 0, 0], port));

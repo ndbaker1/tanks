@@ -1,5 +1,5 @@
 use crate::utils::Prepared;
-use tanks_core::server_types::{ClientEvent, ServerEvent};
+use tanks_events::{ClientEvent, ServerEvent};
 use wasm_bindgen::{prelude::*, JsCast};
 use web_sys::{MessageEvent, WebSocket};
 
