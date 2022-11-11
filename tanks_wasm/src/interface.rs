@@ -119,7 +119,7 @@ pub fn setup_window_listeners() {
     keydown_callback.forget();
 
     // Key Releasing Callback
-    let keyup_callback = Closure::wrap(Box::new(move |event: KeyboardEvent| {
+    let keyup_callback = Closure::wrap(Box::new(move |_event: KeyboardEvent| {
         CONNECTION_STATE.with(|state| {
             if let Some(ws) = &state.borrow().ws {
                 if ws.is_ready() {

@@ -7,7 +7,7 @@ pub struct Environment {
 
 /// Ground or Wall objects that get displayed
 /// and have collisions for the Tanks or the Projectiles
-#[derive(Debug, PartialEq, PartialOrd)]
+#[derive(Debug, Eq, PartialEq, PartialOrd)]
 pub enum Tile {
     IndestructableWall(usize),
     // Left:    health of the wall

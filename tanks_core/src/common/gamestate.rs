@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeSet, HashMap};
 
 use crate::utils::{circle_circle_collision, circle_rect_collision, Vector2};
 
@@ -107,6 +107,7 @@ impl GameState {
         for freed_bullet_player_id in self
             .collisions_between_bullets()
             .into_iter()
+            .rev()
             .map(|i| self.bullets.remove(i).player_id)
         {
             if let Some(player) = self.players.get_mut(&freed_bullet_player_id) {
@@ -118,6 +119,7 @@ impl GameState {
         for freed_bullet_player_id in self
             .bullet_collisions_with_tiles()
             .into_iter()
+            .rev()
             .map(|i| self.bullets.remove(i).player_id)
         {
             if let Some(player) = self.players.get_mut(&freed_bullet_player_id) {
@@ -153,6 +155,7 @@ impl GameState {
         for freed_bullet_player_id in self
             .bullet_collisions_with_bounds()
             .into_iter()
+            .rev()
             .map(|i| self.bullets.remove(i).player_id)
         {
             if let Some(player) = self.players.get_mut(&freed_bullet_player_id) {
@@ -178,8 +181,8 @@ impl GameState {
 
     /// Processes collisions between bullets and collects unqiue items
     /// Returns the indicies of bullets which should need to be removed
-    fn collisions_between_bullets(&mut self) -> HashSet<usize> {
-        let mut set = HashSet::new();
+    fn collisions_between_bullets(&mut self) -> BTreeSet<usize> {
+        let mut set = BTreeSet::new();
 
         // TODO: try to optimize this later from O(n^2)
         for i in 0..self.bullets.len() {
@@ -191,7 +194,7 @@ impl GameState {
                         &self.bullets[j].position,
                         BULLET_RADIUS,
                     )
-                    .is_ok()
+                    .is_err()
                 {
                     set.insert(i);
                     set.insert(j);
@@ -202,8 +205,8 @@ impl GameState {
         set
     }
 
-    fn bullet_collisions_with_tiles(&mut self) -> HashSet<usize> {
-        let mut set = HashSet::new();
+    fn bullet_collisions_with_tiles(&mut self) -> BTreeSet<usize> {
+        let mut set = BTreeSet::new();
 
         for (i, bullet) in &mut self.bullets.iter_mut().enumerate() {
             for (loc, tile) in &self.environment.tiles {
@@ -241,8 +244,8 @@ impl GameState {
         set
     }
 
-    fn bullet_collisions_with_bounds(&mut self) -> HashSet<usize> {
-        let mut set = HashSet::new();
+    fn bullet_collisions_with_bounds(&mut self) -> BTreeSet<usize> {
+        let mut set = BTreeSet::new();
 
         for (i, bullet) in &mut self.bullets.iter_mut().enumerate() {
             let collides_x = bullet.position.x + BULLET_RADIUS > MAP_BLOCK_WIDTH as _
