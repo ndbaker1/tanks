@@ -146,7 +146,7 @@ fn render_game(context: &CanvasRenderingContext2d, game_state: &ClientGameState)
 
         context.set_fill_style(&"white".into());
         context
-            .fill_text(&player, coord.x, coord.y)
+            .fill_text(player, coord.x, coord.y)
             .expect("text could not be drawn");
     }
 

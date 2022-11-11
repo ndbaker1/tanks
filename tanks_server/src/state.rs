@@ -1,7 +1,6 @@
 use std::{collections::HashMap, sync::Arc};
 
 use axum::extract::ws::{Message, WebSocket};
-use dashmap::DashMap;
 use futures::stream::SplitSink;
 use tokio::sync::Mutex;
 
@@ -9,8 +8,8 @@ pub type SharedServerState<T> = Arc<ServerState<T>>;
 
 #[derive(Debug, Default)]
 pub struct ServerState<T> {
-    pub clients: DashMap<String, Client>,
-    pub sessions: DashMap<String, Session<T>>,
+    pub clients: Arc<Mutex<HashMap<String, Client>>>,
+    pub sessions: Arc<Mutex<HashMap<String, Session<T>>>>,
 }
 
 #[derive(Debug)]
