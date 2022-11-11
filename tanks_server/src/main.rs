@@ -50,7 +50,7 @@ async fn main() {
 
                 // broadcast to all clients
                 for client_id in session.active_client_set() {
-                    state_copy
+                    if let Err(e) = state_copy
                         .clients
                         .lock()
                         .await
@@ -63,7 +63,9 @@ async fn main() {
                             serde_json::to_string(&broadcast_data).unwrap(),
                         ))
                         .await
-                        .unwrap();
+                    {
+                        tracing::error!("transmission error: [{}]", e);
+                    }
                 }
             }
 

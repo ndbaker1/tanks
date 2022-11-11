@@ -55,12 +55,30 @@ pub fn setup_canvas() -> Rc<HtmlCanvasElement> {
 pub fn setup_window_listeners() {
     // Mouse Tracking callback
     let mousemove_callback = Closure::wrap(Box::new(move |event: MouseEvent| {
+        let pos = Vector2 {
+            x: event.offset_x().into(),
+            y: event.offset_y().into(),
+        };
+
         GAME_STATE.with(|state| {
-            state.borrow_mut().mouse_pos = Vector2 {
-                x: event.offset_x().into(),
-                y: event.offset_y().into(),
-            }
-        })
+            state.borrow_mut().mouse_pos = pos;
+            let state = state.borrow();
+            let player_pos = state.get_own_player_data();
+
+            CONNECTION_STATE.with(|state| {
+                if let Some(ws) = &state.borrow_mut().ws {
+                    if ws.is_ready() {
+                        ws.send_with_str(
+                            &serde_json::to_string(&ClientEvent::AimUpdate {
+                                angle: (pos.y - player_pos.y).atan2(pos.x - player_pos.x),
+                            })
+                            .unwrap(),
+                        )
+                        .expect("websocket sent");
+                    }
+                }
+            });
+        });
     }) as Box<dyn FnMut(_)>);
     js_window()
         .add_event_listener_with_callback("mousemove", mousemove_callback.as_ref().unchecked_ref())
@@ -91,7 +109,15 @@ pub fn setup_window_listeners() {
                 Some(ws) => {
                     if ws.is_ready() {
                         let movement_update = ClientEvent::MovementUpdate {
-                            direction: from(&event.key().to_uppercase()),
+                            direction: GAME_STATE.with(|gstate| {
+                                gstate.borrow_mut().keysdown.insert(event.key());
+                                gstate
+                                    .borrow()
+                                    .keysdown
+                                    .iter()
+                                    .fold(Vector2::zero(), |acc, cur| acc.plus(&from(cur)))
+                                    .normalize()
+                            }),
                         };
 
                         ws.send_with_str(&serde_json::to_string(&movement_update).unwrap())
@@ -119,12 +145,20 @@ pub fn setup_window_listeners() {
     keydown_callback.forget();
 
     // Key Releasing Callback
-    let keyup_callback = Closure::wrap(Box::new(move |_event: KeyboardEvent| {
+    let keyup_callback = Closure::wrap(Box::new(move |event: KeyboardEvent| {
         CONNECTION_STATE.with(|state| {
             if let Some(ws) = &state.borrow().ws {
                 if ws.is_ready() {
                     let keyreleased_event = ClientEvent::MovementUpdate {
-                        direction: Vector2::zero(),
+                        direction: GAME_STATE.with(|gstate| {
+                            gstate.borrow_mut().keysdown.remove(&event.key());
+                            gstate
+                                .borrow()
+                                .keysdown
+                                .iter()
+                                .fold(Vector2::zero(), |acc, cur| acc.plus(&from(cur)))
+                                .normalize()
+                        }),
                     };
 
                     ws.send_with_str(&serde_json::to_string(&keyreleased_event).unwrap())
@@ -140,24 +174,12 @@ pub fn setup_window_listeners() {
 }
 
 fn from(dir: &str) -> Vector2 {
-    match dir {
+    match dir.to_uppercase().as_str() {
         "W" => Vector2 { x: 0.0, y: -1.0 },
-        // Direction::NorthEast => Vector2 {
-        //     x: 0.707,
-        //     y: -0.707,
-        // },
         "D" => Vector2 { x: 1.0, y: 0.0 },
-        // Direction::SouthEast => Vector2 { x: 0.707, y: 0.707 },
         "S" => Vector2 { x: 0.0, y: 1.0 },
-        // Direction::SouthWest => Vector2 {
-        //     x: -0.707,
-        //     y: 0.707,
-        // },
         "A" => Vector2 { x: -1.0, y: 0.0 },
-        // Direction::NorthWest => Vector2 {
-        //     x: -0.707,
-        //     y: -0.707,
-        // },
+
         _ => Vector2::zero(),
     }
 }
