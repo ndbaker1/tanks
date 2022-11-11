@@ -1,8 +1,16 @@
 use std::{env, net::SocketAddr, sync::Arc};
 
-use axum::{response::IntoResponse, routing::get, Extension, Router};
+use axum::{
+    body::{boxed, Body, BoxBody},
+    http::{Request, Response, StatusCode, Uri},
+    response::IntoResponse,
+    routing::{get, get_service},
+    Extension, Router,
+};
 use tanks_core::common::gamestate::GameState;
 use tokio::{sync::Mutex, task::JoinHandle};
+use tower::ServiceExt;
+use tower_http::services::ServeDir;
 use tracing::{info, Level};
 
 use crate::state::SharedServerState;
@@ -31,6 +39,11 @@ async fn main() {
     let app = Router::new()
         .route("/api/health", get(health_handler))
         .route("/api/ws", get(ws::websocket_handler))
+        .fallback(
+            get_service(ServeDir::new("dist")).handle_error(|error| async move {
+                (StatusCode::INTERNAL_SERVER_ERROR, format!("{error}"))
+            }),
+        )
         .layer(Extension(state));
 
     let addr = SocketAddr::from(([0, 0, 0, 0], port));

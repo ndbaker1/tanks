@@ -126,11 +126,11 @@ pub fn get_websocket_uri(username: &str) -> String {
     };
 
     format!(
-        "{}://{}:8000/{}?id={}",
+        "{}://{}/{}?id={}",
         websocket_protocol,
         js_window()
             .location()
-            .hostname()
+            .host()
             .expect("no valid host for url"),
         WEBSOCKET_PATH,
         username,
