@@ -256,8 +256,12 @@ impl GameState {
             if collides_x || collides_y {
                 if bullet.ricochets > 0 {
                     bullet.ricochets -= 1;
-                    bullet.velocity.x *= -(collides_x as i8) as f64;
-                    bullet.velocity.y *= -(collides_y as i8) as f64;
+                    if collides_x {
+                        bullet.velocity.x *= -(collides_x as i8) as f64;
+                    }
+                    if collides_y {
+                        bullet.velocity.y *= -(collides_y as i8) as f64;
+                    }
                 } else {
                     set.insert(i);
                 }

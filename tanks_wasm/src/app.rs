@@ -3,7 +3,10 @@ use crate::{
     login::render_login,
     utils::{get_block_size, Prepared},
 };
-use std::{collections::HashMap, f64::consts::PI};
+use std::{
+    collections::{HashMap, HashSet},
+    f64::consts::PI,
+};
 use tanks_core::{
     common::{
         constants::{BULLET_RADIUS, MAP_BLOCK_HEIGHT, MAP_BLOCK_WIDTH},
@@ -18,6 +21,7 @@ pub struct ClientPlayerData {}
 
 pub struct ClientGameState {
     pub id: String,
+    pub keysdown: HashSet<String>,
     /// Mouse Position relative to bounds of the window
     pub mouse_pos: Vector2,
     pub player_data: HashMap<String, Vector2>,
@@ -29,6 +33,7 @@ impl ClientGameState {
     pub fn new(id: &str) -> Self {
         Self {
             id: String::from(id),
+            keysdown: HashSet::new(),
             mouse_pos: Vector2::zero(),
             player_data: [(String::from(id), Vector2::zero())].into_iter().collect(),
             projectile_data: Vec::new(),

@@ -38,6 +38,9 @@ pub enum ClientEvent {
     MovementUpdate {
         direction: Vector2,
     },
+    AimUpdate {
+        angle: f64,
+    },
     Shoot,
     // Session Related Events
     /// Join a Session with a Given ID

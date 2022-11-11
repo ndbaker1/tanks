@@ -121,9 +121,21 @@ impl ClientRunner<SessionData> {
     }
 
     async fn process_event(&mut self, event: ClientEvent) {
-        info!("{:?}", event);
-
         match event {
+            ClientEvent::AimUpdate { angle } => {
+                let Some(session_id) = &self.cached_session else {
+                    return;
+                };
+
+                if let Some(session) = self.state.sessions.lock().await.get_mut(session_id) {
+                    session
+                        .data
+                        .gamestate
+                        .lock()
+                        .await
+                        .set_player_angle(&self.connection_id, angle);
+                }
+            }
             ClientEvent::MovementUpdate { direction } => {
                 let Some(session_id) = &self.cached_session else {
                     return;
