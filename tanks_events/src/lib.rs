@@ -4,42 +4,44 @@ use serde::{Deserialize, Serialize};
 
 use tanks_core::utils::Vector2;
 
-/// Server Events
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub enum ServerEvent {
-    Game(ServerGameEvent),
-    Session(ServerSessionEvent),
-}
-
-#[derive(Serialize, Deserialize)]
-pub enum ServerSessionEvent {
-    PlayerDisconnect { player: String },
-}
-
-#[derive(Serialize, Deserialize)]
-pub enum ServerGameEvent {
-    ClientPosUpdate { player: String, coord: Vector2 },
+    // Game Related Events
+    GameState {
+        bullets: Vec<BulletWrapper>,
+        tanks: Vec<TankWrapper>,
+    },
     BulletExplode(Vector2),
-    BulletData(Vec<(Vector2, f64)>),
+    // Session Related Rvents
+    PlayerDisconnect {
+        player: String,
+    },
 }
 
-/// Client Events
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
+pub struct BulletWrapper {
+    pub position: Vector2,
+    pub angle: f64,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct TankWrapper {
+    pub id: String,
+    pub position: Vector2,
+    pub movement: Vector2,
+    pub angle: f64,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
 pub enum ClientEvent {
-    Game(ClientGameEvent),
-    Session(ClientSessionEvent),
-}
-
-#[derive(Serialize, Deserialize)]
-pub enum ClientSessionEvent {
+    // Game Related Events
+    MovementUpdate {
+        direction: Vector2,
+    },
+    Shoot,
+    // Session Related Events
     /// Join a Session with a Given ID
     JoinSession(String),
     CreateSession,
     LeaveSession,
-}
-
-#[derive(Serialize, Deserialize)]
-pub enum ClientGameEvent {
-    MovementUpdate { direction: Vector2 },
-    Shoot,
 }

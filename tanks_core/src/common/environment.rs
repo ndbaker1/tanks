@@ -1,10 +1,8 @@
 use std::collections::HashMap;
 
-use crate::utils::Vector2;
-
 #[derive(Debug, Default)]
 pub struct Environment {
-    pub tiles: HashMap<Vector2, Tile>,
+    pub tiles: HashMap<(usize, usize), Tile>,
 }
 
 /// Ground or Wall objects that get displayed

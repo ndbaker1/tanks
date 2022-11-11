@@ -1,5 +1,9 @@
 use std::{cell::RefCell, rc::Rc};
-use tanks_core::{common::Vec2d, MAP_BLOCK_HEIGHT, MAP_BLOCK_WIDTH};
+
+use tanks_core::{
+    common::constants::{MAP_BLOCK_HEIGHT, MAP_BLOCK_WIDTH},
+    utils::Vector2,
+};
 use wasm_bindgen::{prelude::*, JsCast};
 use web_sys::{CanvasRenderingContext2d, HtmlCanvasElement, WebSocket};
 
@@ -52,8 +56,8 @@ pub trait Canvas {
     fn get_2d_context(&self) -> CanvasRenderingContext2d;
 }
 
-pub fn get_window_bounds() -> Vec2d {
-    Vec2d {
+pub fn get_window_bounds() -> Vector2 {
+    Vector2 {
         x: js_window()
             .inner_width()
             .expect("valid window width")
@@ -122,11 +126,11 @@ pub fn get_websocket_uri(username: &str) -> String {
     };
 
     format!(
-        "{}://{}/{}/{}",
+        "{}://{}:8000/{}?id={}",
         websocket_protocol,
         js_window()
             .location()
-            .host()
+            .hostname()
             .expect("no valid host for url"),
         WEBSOCKET_PATH,
         username,

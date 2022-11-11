@@ -1,3 +1,5 @@
+use std::{sync::Arc, vec};
+
 use axum::{
     extract::{
         ws::{Message, WebSocket},
@@ -8,11 +10,15 @@ use axum::{
 };
 use futures::{
     stream::{SplitSink, SplitStream},
-    StreamExt,
+    SinkExt, StreamExt,
 };
-use serde::Deserialize;
-use tanks_core::{common::player::Player, utils::Vector2};
-use tanks_events::{ClientEvent, ClientGameEvent, ClientSessionEvent};
+use serde::{Deserialize, Serialize};
+use tanks_core::{
+    common::{gamestate::GameState, player::Player},
+    utils::Vector2,
+};
+use tanks_events::{ClientEvent, ServerEvent, TankWrapper};
+use tokio::sync::Mutex;
 use tracing::info;
 
 use crate::{
@@ -35,7 +41,7 @@ pub async fn websocket_handler(
             // By splitting we can send and receive at the same time.
             let (sender, receiver) = socket.split();
 
-            ClientRunner::new(state, sender, receiver, connection_id).run()
+            ClientRunner::new(state, Arc::new(Mutex::new(sender)), receiver, connection_id).run()
         })
     } else {
         format!("User [{}] Already Connected", connection_id).into_response()
@@ -44,7 +50,7 @@ pub async fn websocket_handler(
 
 struct ClientRunner<T> {
     state: SharedServerState<T>,
-    sender: SplitSink<WebSocket, Message>,
+    sender: Arc<Mutex<SplitSink<WebSocket, Message>>>,
     receiver: SplitStream<WebSocket>,
     connection_id: String,
     cached_session: Option<String>,
@@ -53,7 +59,7 @@ struct ClientRunner<T> {
 impl ClientRunner<SessionData> {
     pub fn new(
         state: SharedServerState<SessionData>,
-        sender: SplitSink<WebSocket, Message>,
+        sender: Arc<Mutex<SplitSink<WebSocket, Message>>>,
         receiver: SplitStream<WebSocket>,
         connection_id: String,
     ) -> Self {
@@ -68,6 +74,9 @@ impl ClientRunner<SessionData> {
 
     async fn run(mut self) {
         self.connect_client();
+
+        // place the player into a session
+        self.process_event(ClientEvent::CreateSession).await;
 
         // Loop until a text message is found.
         while let Some(Ok(message)) = self.receiver.next().await {
@@ -90,6 +99,7 @@ impl ClientRunner<SessionData> {
             self.connection_id.clone(),
             Client {
                 id: self.connection_id.clone(),
+                sender: self.sender.clone(),
             },
         );
     }
@@ -118,7 +128,7 @@ impl ClientRunner<SessionData> {
 
     async fn process_event(&mut self, event: ClientEvent) {
         match event {
-            ClientEvent::Game(ClientGameEvent::MovementUpdate { direction }) => {
+            ClientEvent::MovementUpdate { direction } => {
                 let Some(session_id) = &self.cached_session else {
                     return;
                 };
@@ -134,7 +144,7 @@ impl ClientRunner<SessionData> {
                     .await
                     .set_player_movement(&self.connection_id, &direction);
             }
-            ClientEvent::Game(ClientGameEvent::Shoot) => {
+            ClientEvent::Shoot => {
                 let Some(session_id) = &self.cached_session else {
                     return;
                 };
@@ -150,16 +160,73 @@ impl ClientRunner<SessionData> {
                     .await
                     .player_shoot(&self.connection_id);
             }
-            ClientEvent::Session(ClientSessionEvent::CreateSession) => {
+            ClientEvent::CreateSession => {
                 let session_id = generate_session_id();
                 let mut session = Session::<SessionData>::new(session_id.clone());
 
                 // Start ticking the GameState when the session goes live
-                let gamestate_arc = session.data.gamestate.clone();
-                session.data.task_handle = Some(tokio::spawn(async move {
+                let gamestate_tick_arc = session.data.gamestate.clone();
+                session.data.task_handles.push(tokio::spawn(async move {
                     loop {
-                        gamestate_arc.lock().await.tick();
+                        gamestate_tick_arc.lock().await.tick();
                         tokio::time::sleep(tokio::time::Duration::from_secs_f64(1.0 / 60.0)).await;
+                    }
+                }));
+
+                let gamestate_broadcast_arc = session.data.gamestate.clone();
+                let state_copy = self.state.clone();
+                let session_id_copy = session_id.clone();
+                session.data.task_handles.push(tokio::spawn(async move {
+                    loop {
+                        let gamestate = gamestate_broadcast_arc.lock().await;
+                        // collect stats to deliver to clients
+                        let broadcast_data = ServerEvent::GameState {
+                            bullets: vec![],
+                            tanks: gamestate
+                                .players
+                                .iter()
+                                .map(
+                                    |(
+                                        _,
+                                        Player {
+                                            id,
+                                            angle,
+                                            position,
+                                            movement,
+                                            ..
+                                        },
+                                    )| TankWrapper {
+                                        angle: *angle,
+                                        id: id.clone(),
+                                        movement: *movement,
+                                        position: *position,
+                                    },
+                                )
+                                .collect(),
+                        };
+
+                        // broadcast to all clients
+                        for client_id in state_copy
+                            .sessions
+                            .get(&session_id_copy)
+                            .unwrap()
+                            .active_client_set()
+                        {
+                            state_copy
+                                .clients
+                                .get_mut(client_id)
+                                .unwrap()
+                                .sender
+                                .lock()
+                                .await
+                                .send(Message::Text(
+                                    serde_json::to_string(&broadcast_data).unwrap(),
+                                ))
+                                .await
+                                .unwrap();
+                        }
+
+                        tokio::time::sleep(tokio::time::Duration::from_secs_f64(1.0 / 10.0)).await;
                     }
                 }));
 
@@ -176,7 +243,7 @@ impl ClientRunner<SessionData> {
 
                 self.state.sessions.insert(session_id.clone(), session);
             }
-            ClientEvent::Session(ClientSessionEvent::JoinSession(session_id)) => {
+            ClientEvent::JoinSession(session_id) => {
                 let Some(mut session) = self.state.sessions.get_mut(&session_id) else {
                     return;
                 };
@@ -192,7 +259,7 @@ impl ClientRunner<SessionData> {
 
                 self.cached_session = Some(session_id.clone());
             }
-            ClientEvent::Session(ClientSessionEvent::LeaveSession) => {
+            ClientEvent::LeaveSession => {
                 if let Some(session_id) = &self.cached_session {
                     self.leave_session(session_id);
                 };
@@ -203,9 +270,16 @@ impl ClientRunner<SessionData> {
     /// Remove sessions and kill background tasks spawned from it
     fn cleanup_session(&self, session_id: &str) {
         if let Some(session) = self.state.sessions.remove(session_id) {
-            if let Some(task) = session.1.data.task_handle {
+            for task in session.1.data.task_handles {
                 task.abort();
             }
         }
+    }
+}
+
+fn from(gs: &GameState) -> ServerEvent {
+    ServerEvent::GameState {
+        bullets: vec![],
+        tanks: vec![],
     }
 }
