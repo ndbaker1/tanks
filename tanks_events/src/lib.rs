@@ -24,7 +24,7 @@ pub struct BulletWrapper {
     pub angle: f64,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Default)]
 pub struct TankWrapper {
     pub id: String,
     pub position: Vector2,
