@@ -165,7 +165,7 @@ impl ClientRunner<SessionData> {
                 }
             }
             ClientEvent::CreateSession => {
-                let new_session = self.create_session().await;
+                let new_session = self.create_session(None).await;
 
                 self.state
                     .sessions
@@ -175,6 +175,7 @@ impl ClientRunner<SessionData> {
             }
             ClientEvent::JoinSession(session_id) => {
                 let mut lock = self.state.sessions.lock().await;
+
                 if let Some(session) = lock.get_mut(&session_id) {
                     session
                         .client_statuses
@@ -189,7 +190,7 @@ impl ClientRunner<SessionData> {
                 } else {
                     drop(lock);
 
-                    let mut session = self.create_session().await;
+                    let mut session = self.create_session(Some(session_id)).await;
 
                     session
                         .client_statuses
@@ -217,8 +218,11 @@ impl ClientRunner<SessionData> {
         }
     }
 
-    async fn create_session(&mut self) -> Session<crate::SessionContainer> {
-        let session_id = generate_session_id();
+    async fn create_session(
+        &mut self,
+        reserved_id: Option<String>,
+    ) -> Session<crate::SessionContainer> {
+        let session_id = reserved_id.unwrap_or_else(|| generate_session_id());
         let mut session = Session::<SessionData>::new(session_id.clone());
 
         session
