@@ -13,11 +13,11 @@ tanks_core = { path = "../tanks_core" }
 tanks_events = { path = "../tanks_events" }
 
 regex = "1"
-js-sys = "0.3.55"
-wasm-bindgen = "0.2.74"
-wee_alloc = "0.4.5"
 console_error_panic_hook = "0.1.7"
-serde_json = "1.0.75"
+wasm-bindgen = "0.2.83"
+wee_alloc = "0.4.5"
+js-sys = "0.3.60"
+serde_json = "1.0.89"
 
 [dependencies.serde]
 version = "1.0.133"
