@@ -124,7 +124,7 @@ fn convert_gamestate_to_broadcast(gs: &GameState) -> ServerEvent {
                     _,
                     Player {
                         id,
-                        angle,
+                        gun_angle: angle,
                         position,
                         movement,
                         ..

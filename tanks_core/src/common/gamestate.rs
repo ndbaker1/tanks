@@ -27,7 +27,7 @@ impl GameState {
 
     pub fn set_player_angle(&mut self, player_id: &str, angle: f64) {
         if let Some(player) = self.players.get_mut(player_id) {
-            player.angle = angle;
+            player.gun_angle = angle;
         }
     }
 
@@ -42,15 +42,15 @@ impl GameState {
             // decrement available bullets
             player.bullets_remaining -= 1;
 
-            let velocity = Vector2 {
-                x: BULLET_SPEED * player.angle.cos(),
-                y: BULLET_SPEED * player.angle.sin(),
-            };
+            let velocity = Vector2::new(
+                BULLET_SPEED * player.gun_angle.cos(),
+                BULLET_SPEED * player.gun_angle.sin(),
+            );
 
             self.bullets.push(Bullet {
                 velocity,
                 ricochets: 1,
-                angle: player.angle,
+                angle: player.gun_angle,
                 position: player.position,
                 player_id: player.id.clone(),
             });
@@ -134,18 +134,14 @@ impl GameState {
                     if let Err(Vector2 { x, y }) = circle_rect_collision(
                         &player.position,
                         PLAYER_RADIUS,
-                        &Vector2 {
-                            x: loc.0 as _,
-                            y: loc.1 as _,
-                        },
+                        &Vector2::new(loc.0 as _, loc.1 as _),
                         1.0,
                         1.0,
                     ) {
                         // push the tanks out of the collision box
-                        player.position = player.position.plus(&Vector2 {
-                            x: PLAYER_RADIUS - x,
-                            y: PLAYER_RADIUS - y,
-                        })
+                        player.position = player
+                            .position
+                            .plus(&Vector2::new(PLAYER_RADIUS - x, PLAYER_RADIUS - y));
                     }
                 }
             }
@@ -214,10 +210,7 @@ impl GameState {
                     if let Err(collision) = circle_rect_collision(
                         &bullet.position,
                         PLAYER_RADIUS,
-                        &Vector2 {
-                            x: loc.0 as _,
-                            y: loc.1 as _,
-                        },
+                        &Vector2::new(loc.0 as _, loc.1 as _),
                         1.0,
                         1.0,
                     ) {
