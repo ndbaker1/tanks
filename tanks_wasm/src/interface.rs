@@ -55,26 +55,23 @@ pub fn setup_canvas() -> Rc<HtmlCanvasElement> {
 pub fn setup_window_listeners() {
     // Mouse Tracking callback
     let mousemove_callback = Closure::wrap(Box::new(move |event: MouseEvent| {
-        let pos = Vector2 {
-            x: event.offset_x().into(),
-            y: event.offset_y().into(),
-        };
+        let mouse_pos = Vector2::new(event.offset_x().into(), event.offset_y().into());
 
         GAME_STATE.with(|state| {
-            state.borrow_mut().mouse_pos = pos;
+            state.borrow_mut().mouse_pos = mouse_pos;
             let state = state.borrow();
             let player_pos = state.get_own_player_data();
 
             CONNECTION_STATE.with(|state| {
                 if let Some(ws) = &state.borrow_mut().ws {
                     if ws.is_ready() {
-                        ws.send_with_str(
-                            &serde_json::to_string(&ClientEvent::AimUpdate {
-                                angle: (pos.y - player_pos.y).atan2(pos.x - player_pos.x),
-                            })
-                            .unwrap(),
-                        )
-                        .expect("websocket sent");
+                        let angle = (mouse_pos.y - player_pos.position.y)
+                            .atan2(mouse_pos.x - player_pos.position.x);
+
+                        let aim_message =
+                            &serde_json::to_string(&ClientEvent::AimUpdate { angle }).unwrap();
+
+                        ws.send_with_str(aim_message).expect("websocket sent");
                     }
                 }
             });

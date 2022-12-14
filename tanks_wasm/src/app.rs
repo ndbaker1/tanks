@@ -14,7 +14,7 @@ use tanks_core::{
     },
     utils::Vector2,
 };
-use tanks_events::ServerEvent;
+use tanks_events::{ServerEvent, TankWrapper};
 use web_sys::{CanvasRenderingContext2d, HtmlCanvasElement};
 
 pub struct ClientPlayerData {}
@@ -24,7 +24,7 @@ pub struct ClientGameState {
     pub keysdown: HashSet<String>,
     /// Mouse Position relative to bounds of the window
     pub mouse_pos: Vector2,
-    pub player_data: HashMap<String, Vector2>,
+    pub player_data: HashMap<String, TankWrapper>,
     pub projectile_data: Vec<Vector2>,
     pub map_landmarks: Environment,
 }
@@ -35,32 +35,19 @@ impl ClientGameState {
             id: String::from(id),
             keysdown: HashSet::new(),
             mouse_pos: Vector2::zero(),
-            player_data: [(String::from(id), Vector2::zero())].into_iter().collect(),
+            player_data: [(String::from(id), TankWrapper::default())]
+                .into_iter()
+                .collect(),
             projectile_data: Vec::new(),
             map_landmarks: Environment::default(),
         }
     }
 
-    /// Gets the angle of the player to the mouse
-    pub fn get_mouse_angle(&self) -> f64 {
-        let player_pos = self.get_own_player_data();
-        let delta_x = self.mouse_pos.x - player_pos.x;
-        let delta_y = self.mouse_pos.y - player_pos.y;
-        (delta_y).atan2(delta_x)
-    }
-
     /// Get the Player Data corresponding to the current player using the saved id
-    pub fn get_own_player_data(&self) -> &Vector2 {
+    pub fn get_own_player_data(&self) -> &TankWrapper {
         self.player_data
             .get(&self.id)
             .expect("player did not have their own data")
-    }
-
-    /// The Camera Position for the Player
-    ///
-    /// This is the Top-Left coordinate
-    pub fn get_camera_pos(&self) -> Vector2 {
-        Vector2::zero()
     }
 }
 
@@ -70,9 +57,10 @@ pub fn handle_server_event(event: ServerEvent, game_state: &mut ClientGameState)
             // either update the player or add them
             for tank in tanks {
                 if let Some(player_data) = game_state.player_data.get_mut(&tank.id) {
-                    *player_data = tank.position.scale(get_block_size());
+                    *player_data = tank;
+                    player_data.position = player_data.position.scale(get_block_size());
                 } else {
-                    game_state.player_data.insert(tank.id, tank.position);
+                    game_state.player_data.insert(tank.id.clone(), tank);
                 }
             }
 
@@ -110,8 +98,6 @@ pub fn render(element: &HtmlCanvasElement, context: &CanvasRenderingContext2d) {
 fn render_game(context: &CanvasRenderingContext2d, game_state: &ClientGameState) {
     context.save();
 
-    let player_coord = game_state.get_own_player_data();
-
     let block_size = get_block_size();
 
     let colors = ["#5C6784", "#1D263B"];
@@ -136,27 +122,8 @@ fn render_game(context: &CanvasRenderingContext2d, game_state: &ClientGameState)
         }
     }
 
-    for (player, coord) in &game_state.player_data {
-        context.set_fill_style(&"red".into());
-        context.fill_rect(
-            coord.x - block_size / 2.0,
-            coord.y - block_size / 2.0,
-            block_size,
-            block_size,
-        );
-
-        // I think we want this to be a fixed pixel size so that you can always see the name
-        context.set_font("40px monospace");
-        context.set_text_align("center");
-
-        context.set_fill_style(&"white".into());
-        context
-            .fill_text(player, coord.x, coord.y)
-            .expect("text could not be drawn");
-    }
-
+    context.set_fill_style(&"grey".into());
     for bullet in &game_state.projectile_data {
-        context.set_fill_style(&"grey".into());
         context.begin_path();
         context
             .arc(
@@ -170,11 +137,54 @@ fn render_game(context: &CanvasRenderingContext2d, game_state: &ClientGameState)
         context.fill();
     }
 
-    context.set_stroke_style(&"white".into());
-    context.begin_path();
-    context.move_to(player_coord.x, player_coord.y);
-    context.line_to(game_state.mouse_pos.x, game_state.mouse_pos.y);
-    context.stroke();
+    for (player, tank_data) in &game_state.player_data {
+        context.save();
+
+        context
+            .translate(tank_data.position.x, tank_data.position.y)
+            .unwrap();
+
+        context
+            .rotate(tank_data.movement.y.atan2(tank_data.movement.x))
+            .unwrap();
+
+        context.set_fill_style(&"red".into());
+        context.fill_rect(-block_size / 2.0, -block_size / 2.0, block_size, block_size);
+
+        context.set_stroke_style(&"black".into());
+        context.set_line_width(8.0);
+
+        context.begin_path();
+        context.move_to(-block_size / 2.0, -block_size / 2.0);
+        context.line_to(block_size / 2.0, -block_size / 2.0);
+        context.stroke();
+
+        context.begin_path();
+        context.move_to(-block_size / 2.0, block_size / 2.0);
+        context.line_to(block_size / 2.0, block_size / 2.0);
+        context.stroke();
+
+        context.restore();
+
+        // I think we want this to be a fixed pixel size so that you can always see the name
+        context.set_font("20px monospace");
+        context.set_text_align("center");
+
+        context.set_fill_style(&"white".into());
+        context
+            .fill_text(player, tank_data.position.x, tank_data.position.y)
+            .expect("text could not be drawn");
+
+        context.set_stroke_style(&"white".into());
+        context.begin_path();
+        context.move_to(tank_data.position.x, tank_data.position.y);
+        context.line_to(
+            tank_data.position.x + tank_data.angle.cos() * block_size * 0.8,
+            tank_data.position.y + tank_data.angle.sin() * block_size * 0.8,
+        );
+        context.set_line_width(8.0);
+        context.stroke();
+    }
 
     context.restore();
 }
